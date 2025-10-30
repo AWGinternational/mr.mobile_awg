@@ -1,0 +1,914 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String                   @id @default(cuid())
+  email              String                   @unique
+  password           String
+  name               String
+  phone              String?
+  cnic               String?
+  address            String?
+  city               String?
+  province           String?
+  businessName       String?
+  businessRegNo      String?
+  role               UserRole
+  status             UserStatus               @default(PENDING_VERIFICATION)
+  emailVerified      DateTime?
+  lastLogin          DateTime?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  createdById        String?
+  auditLogs          AuditLog[]
+  sessions           Session[]
+  workerModuleAccess ShopWorkerModuleAccess[] @relation("WorkerModuleAccess")
+  workerShops        ShopWorker[]
+  ownedShops         Shop[]                   @relation("ShopOwner")
+  moduleAccess       UserModuleAccess[]
+  createdBy          User?                    @relation("UserCreator", fields: [createdById], references: [id])
+  createdUsers       User[]                   @relation("UserCreator")
+  cartItems          CartItem[]               // 🛒 CART ITEMS RELATION
+  mobileServices     MobileService[]          // 🆕 MOBILE SERVICES RELATION
+  salesAsSeller      Sale[]                   @relation("SaleSeller") // 🆕 SALES BY THIS WORKER
+  approvalRequests   ApprovalRequest[]        @relation("WorkerRequests") // 🆕 WORKER APPROVAL REQUESTS
+  reviewedApprovals  ApprovalRequest[]        @relation("ReviewedRequests") // 🆕 REVIEWED APPROVAL REQUESTS
+  sentMessages       Message[]                @relation("SentMessages") // 💬 SENT MESSAGES
+  receivedMessages   Message[]                @relation("ReceivedMessages") // 💬 RECEIVED MESSAGES
+  messageReads       MessageRead[]            // 💬 MESSAGE READ RECEIPTS
+
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Shop {
+  id                 String                   @id @default(cuid())
+  name               String
+  code               String                   @unique
+  address            String
+  city               String
+  province           String
+  postalCode         String?
+  phone              String
+  email              String?
+  licenseNumber      String?
+  gstNumber          String?
+  status             ShopStatus               @default(ACTIVE)
+  databaseUrl        String
+  settings           Json                     @default("{}")
+  ownerId            String
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  businessInfo       Json                     @default("{}")
+  databaseName       String
+  expiresAt          DateTime?
+  isInitialized      Boolean                  @default(false)
+  plan               String                   @default("basic")
+  subdomain          String?                  @unique
+  workerModuleAccess ShopWorkerModuleAccess[]
+  workers            ShopWorker[]
+  owner              User                     @relation("ShopOwner", fields: [ownerId], references: [id])
+  
+  // 🆕 SHOP ISOLATION RELATIONS
+  categories         Category[]
+  brands             Brand[]
+  products           Product[]
+  suppliers          Supplier[]
+  inventoryItems     InventoryItem[]
+  customers          Customer[]
+  sales              Sale[]
+  cartItems          CartItem[]               // 🛒 CART ITEMS RELATION
+  dailyClosings      DailyClosing[]           @relation("DailyClosings") // 🆕 DAILY CLOSING RELATION
+  salesPredictions   SalesPrediction[]        @relation("SalesPredictions") // 🆕 SALES PREDICTIONS RELATION
+  stockRecommendations StockRecommendation[]  @relation("StockRecommendations") // 🆕 STOCK RECOMMENDATIONS RELATION
+  approvalRequests   ApprovalRequest[]        @relation("ApprovalRequests") // 🆕 APPROVAL REQUESTS RELATION
+  mobileServices     MobileService[]          // 🆕 MOBILE SERVICES RELATION
+  purchases          Purchase[]               @relation("PurchaseShop") // 🆕 PURCHASES RELATION
+  messages           Message[]                @relation("ShopMessages") // 💬 SHOP MESSAGES
+
+  @@map("shops")
+}
+
+model ShopWorker {
+  id          String   @id @default(cuid())
+  shopId      String
+  userId      String
+  permissions Json     @default("{}")
+  isActive    Boolean  @default(true)
+  joinedAt    DateTime @default(now())
+  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, userId])
+  @@map("shop_workers")
+}
+
+model UserModuleAccess {
+  id          String       @id @default(cuid())
+  userId      String
+  module      SystemModule
+  permissions Permission[]
+  isEnabled   Boolean      @default(true)
+  grantedAt   DateTime     @default(now())
+  grantedBy   String?
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, module])
+  @@map("user_module_access")
+}
+
+model ShopWorkerModuleAccess {
+  id          String       @id @default(cuid())
+  shopId      String
+  workerId    String
+  module      SystemModule
+  permissions Permission[]
+  isEnabled   Boolean      @default(true)
+  grantedAt   DateTime     @default(now())
+  grantedBy   String?
+  shop        Shop         @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  worker      User         @relation("WorkerModuleAccess", fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, workerId, module])
+  @@map("shop_worker_module_access")
+}
+
+model Category {
+  id          String     @id @default(cuid())
+  name        String
+  code        String
+  description String?
+  parentId    String?
+  shopId      String     // 🆕 SHOP ISOLATION
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  parent      Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryHierarchy")
+  products    Product[]
+  shop        Shop       @relation(fields: [shopId], references: [id]) // 🆕 SHOP RELATION
+
+  @@unique([code, shopId]) // 🆕 UNIQUE PER SHOP
+  @@map("categories")
+}
+
+model Brand {
+  id          String    @id @default(cuid())
+  name        String
+  code        String
+  logo        String?
+  description String?
+  shopId      String    // 🆕 SHOP ISOLATION
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+  shop        Shop      @relation(fields: [shopId], references: [id]) // 🆕 SHOP RELATION
+
+  @@unique([code, shopId]) // 🆕 UNIQUE PER SHOP
+  @@unique([name, shopId]) // 🆕 UNIQUE PER SHOP
+  @@map("brands")
+}
+
+model Product {
+  id                String          @id @default(cuid())
+  name              String
+  model             String
+  sku               String
+  barcode           String?
+  type              ProductType
+  status            ProductStatus   @default(ACTIVE)
+  description       String?
+  specifications    Json            @default("{}")
+  images            String[]        @default([])
+  warranty          Int?
+  costPrice         Decimal         @db.Decimal(10, 2)
+  sellingPrice      Decimal         @db.Decimal(10, 2)
+  minimumPrice      Decimal?        @db.Decimal(10, 2)
+  markupPercentage  Decimal?        @db.Decimal(5, 2)
+  categoryId        String
+  brandId           String
+  shopId            String          // 🆕 SHOP ISOLATION
+  lowStockThreshold Int             @default(5)
+  reorderPoint      Int             @default(10)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  inventoryItems    InventoryItem[]
+  brand             Brand           @relation(fields: [brandId], references: [id])
+  category          Category        @relation(fields: [categoryId], references: [id])
+  shop              Shop            @relation(fields: [shopId], references: [id]) // 🆕 SHOP RELATION
+  saleItems         SaleItem[]
+  cartItems         CartItem[]      // 🛒 CART ITEMS RELATION
+
+  @@unique([sku, shopId])     // 🆕 UNIQUE PER SHOP
+  @@unique([barcode, shopId]) // 🆕 UNIQUE PER SHOP (if barcode exists)
+  @@index([shopId, status])   // 🚀 PERFORMANCE: Shop products by status
+  @@index([categoryId])       // 🚀 PERFORMANCE: Products by category
+  @@index([brandId])          // 🚀 PERFORMANCE: Products by brand
+  @@index([shopId, name])     // 🚀 PERFORMANCE: Product search by name
+  @@map("products")
+}
+
+model InventoryItem {
+  id           String          @id @default(cuid())
+  productId    String
+  imei         String?         @unique
+  serialNumber String?
+  batchNumber  String?
+  status       InventoryStatus @default(IN_STOCK)
+  costPrice    Decimal         @db.Decimal(10, 2)
+  purchaseDate DateTime
+  expiryDate   DateTime?
+  location     String?
+  supplierId   String?
+  saleItemId   String?
+  shopId       String          // 🆕 SHOP ISOLATION
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  product      Product         @relation(fields: [productId], references: [id])
+  saleItem     SaleItem?       @relation(fields: [saleItemId], references: [id])
+  supplier     Supplier?       @relation(fields: [supplierId], references: [id])
+  shop         Shop            @relation(fields: [shopId], references: [id]) // 🆕 SHOP RELATION
+
+  @@index([productId, status]) // 🚀 PERFORMANCE: Inventory by product and status
+  @@index([shopId, status])    // 🚀 PERFORMANCE: Shop inventory by status
+  @@index([supplierId])        // 🚀 PERFORMANCE: Inventory by supplier
+  @@map("inventory_items")
+}
+
+// 🛒 CART MANAGEMENT
+model CartItem {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  shopId    String   // 🆕 SHOP ISOLATION
+  quantity  Int
+  addedAt   DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId, shopId]) // 🔒 ONE ITEM PER USER PER PRODUCT PER SHOP
+  @@map("cart_items")
+}
+
+model Supplier {
+  id             String          @id @default(cuid())
+  name           String
+  contactPerson  String
+  email          String?
+  phone          String
+  address        String
+  city           String
+  province       String
+  gstNumber      String?
+  status         SupplierStatus  @default(ACTIVE)
+  creditLimit    Decimal?        @db.Decimal(12, 2)
+  creditDays     Int?            @default(30)
+  shopId         String          // 🆕 SHOP ISOLATION
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  inventoryItems InventoryItem[]
+  purchases      Purchase[]
+  shop           Shop            @relation(fields: [shopId], references: [id]) // 🆕 SHOP RELATION
+
+  @@index([shopId, status]) // 🚀 PERFORMANCE: Suppliers by shop and status
+  @@index([shopId, name])   // 🚀 PERFORMANCE: Supplier search by name
+  @@map("suppliers")
+}
+
+model Purchase {
+  id            String          @id @default(cuid())
+  invoiceNumber String          @unique
+  supplierId    String
+  shopId        String          // 🆕 SHOP ISOLATION
+  totalAmount   Decimal         @db.Decimal(12, 2)
+  paidAmount    Decimal         @default(0) @db.Decimal(12, 2)
+  dueAmount     Decimal         @db.Decimal(12, 2)
+  dueDate       DateTime?
+  status        PurchaseStatus  @default(DRAFT)
+  purchaseDate  DateTime        @default(now())
+  receivedDate  DateTime?
+  notes         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  items         PurchaseItem[]
+  payments      PurchasePayment[]
+  supplier      Supplier        @relation(fields: [supplierId], references: [id])
+  shop          Shop            @relation("PurchaseShop", fields: [shopId], references: [id]) // 🆕 SHOP RELATION
+
+  @@index([shopId, status])       // 🚀 PERFORMANCE: Purchases by shop and status
+  @@index([supplierId])           // 🚀 PERFORMANCE: Purchases by supplier
+  @@index([shopId, purchaseDate]) // 🚀 PERFORMANCE: Purchases by shop and date
+  @@map("purchases")
+}
+
+model PurchasePayment {
+  id            String        @id @default(cuid())
+  purchaseId    String
+  amount        Decimal       @db.Decimal(12, 2)
+  method        PaymentMethod
+  reference     String?
+  notes         String?
+  paymentDate   DateTime      @default(now())
+  createdAt     DateTime      @default(now())
+  purchase      Purchase      @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  @@map("purchase_payments")
+}
+
+model PurchaseItem {
+  id              String   @id @default(cuid())
+  purchaseId      String
+  productId       String
+  quantity        Int
+  receivedQty     Int      @default(0)
+  unitCost        Decimal  @db.Decimal(10, 2)
+  totalCost       Decimal  @db.Decimal(10, 2)
+  imeiNumbers     String[] @default([])
+  serialNumbers   String[] @default([])
+  purchase        Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  @@map("purchase_items")
+}
+
+model Customer {
+  id          String   @id @default(cuid())
+  name        String
+  phone       String   @unique
+  email       String?
+  address     String?
+  city        String?
+  cnic        String?  @unique
+  creditLimit Decimal? @db.Decimal(12, 2)
+  creditUsed  Decimal  @default(0) @db.Decimal(12, 2)
+  shopId      String   // 🆕 SHOP ISOLATION
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  loans       Loan[]
+  sales       Sale[]
+  shop        Shop     @relation(fields: [shopId], references: [id]) // 🆕 SHOP RELATION
+
+  @@unique([phone, shopId]) // 🆕 UNIQUE PER SHOP
+  @@unique([cnic, shopId])  // 🆕 UNIQUE PER SHOP (if cnic exists)
+  @@index([shopId, name])   // 🚀 PERFORMANCE: Customer search by name
+  @@index([shopId, phone])  // 🚀 PERFORMANCE: Customer search by phone
+  @@map("customers")
+}
+
+model Sale {
+  id             String        @id @default(cuid())
+  invoiceNumber  String        @unique
+  customerId     String?
+  sellerId       String?       // 🆕 WORKER TRACKING: Track which worker made this sale
+  subtotal       Decimal       @db.Decimal(12, 2)
+  taxAmount      Decimal       @default(0) @db.Decimal(12, 2)
+  discountAmount Decimal       @default(0) @db.Decimal(12, 2)
+  totalAmount    Decimal       @db.Decimal(12, 2)
+  status         SaleStatus    @default(PENDING)
+  paymentMethod  PaymentMethod
+  paymentStatus  PaymentStatus @default(PENDING)
+  paidAmount     Decimal       @default(0) @db.Decimal(12, 2)
+  notes          String?
+  shopId         String        // 🆕 SHOP ISOLATION
+  saleDate       DateTime      @default(now())
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  payments       Payment[]
+  items          SaleItem[]
+  customer       Customer?     @relation(fields: [customerId], references: [id])
+  seller         User?         @relation("SaleSeller", fields: [sellerId], references: [id]) // 🆕 WORKER RELATION
+  shop           Shop          @relation(fields: [shopId], references: [id]) // 🆕 SHOP RELATION
+
+  @@index([shopId, createdAt]) // 🚀 PERFORMANCE: Sales by shop and date
+  @@index([shopId, status])    // 🚀 PERFORMANCE: Sales by shop and status
+  @@index([customerId])        // 🚀 PERFORMANCE: Customer sales history
+  @@index([saleDate])          // 🚀 PERFORMANCE: Sales by date range
+  @@index([sellerId])          // 🚀 PERFORMANCE: Sales by worker
+  @@map("sales")
+}
+
+model SaleItem {
+  id             String          @id @default(cuid())
+  saleId         String
+  productId      String
+  quantity       Int
+  unitPrice      Decimal         @db.Decimal(10, 2)
+  totalPrice     Decimal         @db.Decimal(10, 2)
+  inventoryItems InventoryItem[]
+  product        Product         @relation(fields: [productId], references: [id])
+  sale           Sale            @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@map("sale_items")
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  saleId        String
+  amount        Decimal       @db.Decimal(12, 2)
+  method        PaymentMethod
+  status        PaymentStatus @default(PENDING)
+  transactionId String?
+  reference     String?
+  notes         String?
+  paymentDate   DateTime      @default(now())
+  createdAt     DateTime      @default(now())
+  sale          Sale          @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model Loan {
+  id                String            @id @default(cuid())
+  customerId        String
+  loanNumber        String            @unique
+  principalAmount   Decimal           @db.Decimal(12, 2)
+  interestRate      Decimal           @db.Decimal(5, 2)
+  totalAmount       Decimal           @db.Decimal(12, 2)
+  paidAmount        Decimal           @default(0) @db.Decimal(12, 2)
+  remainingAmount   Decimal           @db.Decimal(12, 2)
+  installmentAmount Decimal           @db.Decimal(10, 2)
+  totalInstallments Int
+  paidInstallments  Int               @default(0)
+  status            LoanStatus        @default(ACTIVE)
+  startDate         DateTime          @default(now())
+  endDate           DateTime
+  nextDueDate       DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  installments      LoanInstallment[]
+  customer          Customer          @relation(fields: [customerId], references: [id])
+
+  @@map("loans")
+}
+
+model LoanInstallment {
+  id            String    @id @default(cuid())
+  loanId        String
+  installmentNo Int
+  amount        Decimal   @db.Decimal(10, 2)
+  dueDate       DateTime
+  paidDate      DateTime?
+  paidAmount    Decimal?  @db.Decimal(10, 2)
+  status        String    @default("PENDING")
+  createdAt     DateTime  @default(now())
+  loan          Loan      @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@map("loan_installments")
+}
+
+model DailyClosing {
+  id                   String        @id @default(cuid())
+  shopId               String        // 🆕 SHOP ISOLATION
+  date                 DateTime      @db.Date
+  status               ClosingStatus @default(OPEN)
+  
+  // Sales Categories
+  cashSales            Decimal       @default(0) @db.Decimal(15, 2)
+  cardSales            Decimal       @default(0) @db.Decimal(15, 2)
+  bankTransferSales    Decimal       @default(0) @db.Decimal(15, 2)
+  
+  // Load Sales
+  jazzLoadSales        Decimal       @default(0) @db.Decimal(15, 2)
+  telenorLoadSales     Decimal       @default(0) @db.Decimal(15, 2)
+  zongLoadSales        Decimal       @default(0) @db.Decimal(15, 2)
+  ufoneLoadSales       Decimal       @default(0) @db.Decimal(15, 2)
+  
+  // Mobile Payments
+  easypaisaSales       Decimal       @default(0) @db.Decimal(15, 2)
+  jazzcashSales        Decimal       @default(0) @db.Decimal(15, 2)
+  
+  // Other Income
+  receiving            Decimal       @default(0) @db.Decimal(15, 2)
+  bankTransfer         Decimal       @default(0) @db.Decimal(15, 2)
+  loan                 Decimal       @default(0) @db.Decimal(15, 2)
+  cash                 Decimal       @default(0) @db.Decimal(15, 2)
+  
+  // Expenses
+  credit               Decimal       @default(0) @db.Decimal(15, 2)
+  inventory            Decimal       @default(0) @db.Decimal(15, 2)
+  
+  // Totals
+  totalIncome          Decimal       @default(0) @db.Decimal(15, 2)
+  totalExpenses        Decimal       @default(0) @db.Decimal(15, 2)
+  netAmount            Decimal       @default(0) @db.Decimal(15, 2)
+  
+  // Legacy fields (keeping for backward compatibility)
+  totalSales           Decimal       @default(0) @db.Decimal(15, 2)
+  totalCash            Decimal       @default(0) @db.Decimal(15, 2)
+  totalCard            Decimal       @default(0) @db.Decimal(15, 2)
+  totalDigital         Decimal       @default(0) @db.Decimal(15, 2)
+  openingCash          Decimal       @default(0) @db.Decimal(15, 2)
+  closingCash          Decimal       @default(0) @db.Decimal(15, 2)
+  cashDeposited        Decimal       @default(0) @db.Decimal(15, 2)
+  expectedCash         Decimal       @default(0) @db.Decimal(15, 2)
+  actualCash           Decimal       @default(0) @db.Decimal(15, 2)
+  variance             Decimal       @default(0) @db.Decimal(15, 2)
+  
+  notes                String?
+  closedAt             DateTime?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  expenses             Expense[]
+  shop          Shop          @relation("DailyClosings", fields: [shopId], references: [id]) // 🆕 SHOP RELATION
+
+  @@unique([shopId, date]) // 🆕 UNIQUE PER SHOP PER DATE
+  @@map("daily_closings")
+}
+
+model Expense {
+  id             String       @id @default(cuid())
+  dailyClosingId String
+  category       String
+  description    String
+  amount         Decimal      @db.Decimal(10, 2)
+  receipt        String?
+  expenseDate    DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+  dailyClosing   DailyClosing @relation(fields: [dailyClosingId], references: [id], onDelete: Cascade)
+
+  @@map("expenses")
+}
+
+model SalesPrediction {
+  id             String   @id @default(cuid())
+  productId      String
+  shopId         String   // 🆕 SHOP ISOLATION
+  predictionDate DateTime @db.Date
+  predictedSales Int
+  confidence     Decimal  @db.Decimal(5, 4)
+  actualSales    Int?
+  accuracy       Decimal? @db.Decimal(5, 4)
+  createdAt      DateTime @default(now())
+  shop           Shop     @relation("SalesPredictions", fields: [shopId], references: [id]) // 🆕 SHOP RELATION
+
+  @@unique([productId, predictionDate, shopId]) // 🆕 UNIQUE PER SHOP
+  @@map("sales_predictions")
+}
+
+model CustomerInsight {
+  id                String   @id @default(cuid())
+  customerId        String   @unique
+  segment           String
+  lifetimeValue     Decimal  @db.Decimal(12, 2)
+  averageOrderValue Decimal  @db.Decimal(10, 2)
+  purchaseFrequency Decimal  @db.Decimal(5, 2)
+  lastPurchase      DateTime
+  churnProbability  Decimal  @db.Decimal(5, 4)
+  recommendations   Json     @default("[]")
+  updatedAt         DateTime @updatedAt
+
+  @@map("customer_insights")
+}
+
+model StockRecommendation {
+  id             String   @id @default(cuid())
+  productId      String
+  shopId         String   // 🆕 SHOP ISOLATION
+  currentStock   Int
+  recommendedQty Int
+  reason         String
+  priority       String
+  confidence     Decimal  @db.Decimal(5, 4)
+  isProcessed    Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  shop           Shop     @relation("StockRecommendations", fields: [shopId], references: [id]) // 🆕 SHOP RELATION
+
+  @@map("stock_recommendations")
+}
+
+model AuditLog {
+  id        String      @id @default(cuid())
+  userId    String
+  action    AuditAction
+  tableName String
+  recordId  String
+  oldValues Json?
+  newValues Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime    @default(now())
+  user      User        @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([tableName, recordId])
+  @@map("audit_logs")
+}
+
+model ApprovalRequest {
+  id              String         @id @default(cuid())
+  workerId        String
+  shopOwnerId     String
+  shopId          String         // 🆕 SHOP ISOLATION
+  type            ApprovalType
+  tableName       String
+  recordId        String
+  requestData     Json
+  reason          String?
+  status          ApprovalStatus @default(PENDING)
+  approvedAt      DateTime?
+  approvedBy      String?
+  rejectionReason String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  
+  // Relations
+  worker          User           @relation("WorkerRequests", fields: [workerId], references: [id])
+  reviewer        User?          @relation("ReviewedRequests", fields: [approvedBy], references: [id])
+  shop            Shop           @relation("ApprovalRequests", fields: [shopId], references: [id]) // 🆕 SHOP RELATION
+
+  @@index([shopOwnerId, status])
+  @@index([shopId, status]) // 🆕 INDEX FOR SHOP QUERIES
+  @@index([workerId, status]) // 🆕 INDEX FOR WORKER QUERIES
+  @@map("approval_requests")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  SHOP_OWNER
+  SHOP_WORKER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+}
+
+enum ShopStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  MAINTENANCE
+}
+
+enum SystemModule {
+  PRODUCT_MANAGEMENT
+  INVENTORY_MANAGEMENT
+  POS_SYSTEM
+  CUSTOMER_MANAGEMENT
+  SALES_REPORTS
+  SUPPLIER_MANAGEMENT
+  PAYMENT_PROCESSING
+  DAILY_CLOSING
+  LOAN_MANAGEMENT
+  REPAIR_MANAGEMENT
+  SERVICE_MANAGEMENT
+  BUSINESS_ANALYTICS
+  MESSAGING
+}
+
+enum Permission {
+  VIEW
+  CREATE
+  EDIT
+  DELETE
+  MANAGE
+}
+
+enum ProductType {
+  MOBILE_PHONE
+  ACCESSORY
+  SIM_CARD
+  SERVICE
+}
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+  DISCONTINUED
+}
+
+enum InventoryStatus {
+  IN_STOCK
+  OUT_OF_STOCK
+  DAMAGED
+  RETURNED
+  RESERVED
+}
+
+enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+enum SaleStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  RETURNED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  EASYPAISA
+  JAZZCASH
+  BANK_TRANSFER
+  INSTALLMENT
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum LoanStatus {
+  ACTIVE
+  COMPLETED
+  DEFAULTED
+  SUSPENDED
+}
+
+enum PurchaseStatus {
+  DRAFT
+  ORDERED
+  PARTIAL
+  RECEIVED
+  COMPLETED
+  CANCELLED
+}
+
+enum ClosingStatus {
+  OPEN
+  CLOSED
+  RECONCILED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  SALE
+  PAYMENT
+  CLOSING
+  PASSWORD_RESET
+  PASSWORD_RESET_PERFORMED
+  USER_STATUS_CHANGED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ApprovalType {
+  PRODUCT_CREATE
+  PRODUCT_UPDATE
+  PRODUCT_DELETE
+  PRICE_UPDATE
+  STOCK_ADJUSTMENT
+  INVENTORY_UPDATE
+  SALE_UPDATE
+  SALE_DELETE
+  SALE_MODIFICATION
+  CUSTOMER_CREATE
+  CUSTOMER_UPDATE
+  CUSTOMER_DELETE
+  SUPPLIER_CREATE
+  SUPPLIER_UPDATE
+  REFUND_REQUEST
+  DISCOUNT_OVERRIDE
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum ServiceType {
+  EASYPAISA_CASHIN
+  EASYPAISA_CASHOUT
+  JAZZCASH_CASHIN
+  JAZZCASH_CASHOUT
+  BANK_TRANSFER
+  MOBILE_LOAD
+  BILL_PAYMENT
+}
+
+enum LoadProvider {
+  JAZZ
+  TELENOR
+  ZONG
+  UFONE
+}
+
+enum TransactionStatus {
+  COMPLETED
+  PENDING
+  FAILED
+  CANCELLED
+}
+
+enum MessageType {
+  DIRECT        // One-to-one message
+  BROADCAST     // Owner to all workers
+  ANNOUNCEMENT  // Shop-wide announcement
+}
+
+model MobileService {
+  id              String            @id @default(cuid())
+  shopId          String
+  transactionDate DateTime          @default(now())
+  serviceType     ServiceType
+  loadProvider    LoadProvider?
+  customerName    String?
+  phoneNumber     String?
+  amount          Decimal           @db.Decimal(12, 2)
+  commissionRate  Decimal           @db.Decimal(5, 2)
+  commission      Decimal           @db.Decimal(10, 2)
+  discount        Decimal           @default(0) @db.Decimal(10, 2)
+  netCommission   Decimal           @db.Decimal(10, 2)
+  referenceId     String?
+  status          TransactionStatus @default(COMPLETED)
+  notes           String?
+  createdById     String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  shop      Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  createdBy User @relation(fields: [createdById], references: [id])
+
+  @@index([shopId])
+  @@index([transactionDate])
+  @@index([serviceType])
+  @@index([status])
+  @@index([phoneNumber])
+  @@map("mobile_services")
+}
+
+// 💬 MESSAGE MODEL - Owner-Worker Chat System
+model Message {
+  id          String      @id @default(cuid())
+  shopId      String
+  senderId    String
+  receiverId  String?     // null for broadcast messages
+  messageType MessageType @default(DIRECT)
+  subject     String?     // Optional subject line
+  content     String      @db.Text
+  priority    Priority    @default(NORMAL)
+  isRead      Boolean     @default(false)
+  readAt      DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  shop         Shop          @relation("ShopMessages", fields: [shopId], references: [id], onDelete: Cascade)
+  sender       User          @relation("SentMessages", fields: [senderId], references: [id])
+  receiver     User?         @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  messageReads MessageRead[] // For broadcast messages
+
+  @@index([shopId])
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([createdAt])
+  @@index([isRead])
+
+  @@map("messages")
+}
+
+// 💬 MESSAGE READ RECEIPTS - Track who read broadcast messages
+model MessageRead {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  readAt    DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([messageId, userId])
+  @@index([messageId])
+  @@index([userId])
+
+  @@map("message_reads")
+}

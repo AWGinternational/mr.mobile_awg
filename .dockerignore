@@ -1,0 +1,76 @@
+# Docker ignore file - Keep Docker builds fast and secure
+# Ignore all large/unnecessary files from Docker context
+
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Next.js
+.next
+out
+build
+dist
+
+# Environment files (NEVER include in Docker image)
+.env
+.env.local
+.env.development
+.env.production
+.env*.local
+
+# IDE & Editor files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+*.log
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Testing
+coverage
+.nyc_output
+*.test.js
+*.spec.js
+__tests__
+__mocks__
+
+# Documentation
+*.md
+!README.md
+docs
+.github
+
+# Docker files (don't need these inside container)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# CI/CD
+.gitlab-ci.yml
+.travis.yml
+azure-pipelines.yml
+
+# Deployment configs
+vercel.json
+netlify.toml
+.vercel
+.netlify
+
+# Misc
+*.bak
+*.tmp
+temp
+tmp

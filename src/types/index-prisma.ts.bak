@@ -1,0 +1,447 @@
+// Authentication & User Types - Import from Prisma
+export {
+  UserRole,
+  UserStatus,
+  ShopStatus,
+  ProductType,
+  ProductStatus,
+  InventoryStatus,
+  SupplierStatus,
+  SaleStatus,
+  PaymentMethod,
+  PaymentStatus,
+  LoanStatus,
+  ClosingStatus,
+  AuditAction,
+  ApprovalStatus,
+  ApprovalType
+} from '../generated/prisma'
+
+export type {
+  User as PrismaUser,
+  Shop as PrismaShop,
+  ShopWorker as PrismaShopWorker,
+  Product as PrismaProduct,
+  Category as PrismaCategory,
+  Brand as PrismaBrand,
+  InventoryItem as PrismaInventoryItem,
+  Supplier as PrismaSupplier,
+  Customer as PrismaCustomer,
+  Sale as PrismaSale,
+  SaleItem as PrismaSaleItem,
+  Payment as PrismaPayment,
+  Loan as PrismaLoan,
+  LoanInstallment as PrismaLoanInstallment,
+  DailyClosing as PrismaDailyClosing,
+  Expense as PrismaExpense,
+  AuditLog as PrismaAuditLog,
+  ApprovalRequest as PrismaApprovalRequest
+} from '../generated/prisma'
+
+// Extended User interface for application use
+export interface User {
+  id: string
+  email: string
+  name: string
+  phone?: string
+  role: UserRole
+  status: UserStatus
+  emailVerified?: Date
+  lastLogin?: Date
+  createdAt: Date
+  updatedAt: Date
+  createdById?: string
+  // Additional fields for UI
+  shops?: Array<{
+    id: string
+    name: string
+    code: string
+    permissions?: Record<string, any>
+  }>
+}
+
+export interface Session {
+  id: string
+  sessionToken: string
+  userId: string
+  expires: Date
+}
+
+// Shop Types
+export interface Shop {
+  id: string
+  name: string
+  code: string
+  address: string
+  city: string
+  province: string
+  postalCode?: string
+  phone: string
+  email?: string
+  licenseNumber?: string
+  gstNumber?: string
+  status: ShopStatus
+  databaseUrl: string
+  settings: Record<string, any>
+  ownerId: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface ShopWorker {
+  id: string
+  shopId: string
+  userId: string
+  permissions: Record<string, any>
+  isActive: boolean
+  joinedAt: Date
+}
+
+export interface Product {
+  id: string
+  name: string
+  model: string
+  sku: string
+  barcode?: string
+  type: ProductType
+  status: ProductStatus
+  description?: string
+  specifications: Record<string, any>
+  images: string[]
+  warranty?: number
+  costPrice: number
+  sellingPrice: number
+  minimumPrice?: number
+  markupPercentage?: number
+  categoryId: string
+  brandId: string
+  lowStockThreshold: number
+  reorderPoint: number
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface Category {
+  id: string
+  name: string
+  code: string
+  description?: string
+  parentId?: string
+  isActive: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface Brand {
+  id: string
+  name: string
+  code: string
+  logo?: string
+  description?: string
+  isActive: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface InventoryItem {
+  id: string
+  productId: string
+  imei?: string
+  serialNumber?: string
+  batchNumber?: string
+  status: InventoryStatus
+  costPrice: number
+  purchaseDate: Date
+  expiryDate?: Date
+  location?: string
+  supplierId?: string
+  saleItemId?: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface Supplier {
+  id: string
+  name: string
+  contactPerson: string
+  email?: string
+  phone: string
+  address: string
+  city: string
+  province: string
+  gstNumber?: string
+  status: SupplierStatus
+  creditLimit?: number
+  creditDays?: number
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface Customer {
+  id: string
+  name: string
+  phone: string
+  email?: string
+  address?: string
+  city?: string
+  cnic?: string
+  creditLimit?: number
+  creditUsed: number
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface Sale {
+  id: string
+  invoiceNumber: string
+  customerId?: string
+  subtotal: number
+  taxAmount: number
+  discountAmount: number
+  totalAmount: number
+  status: SaleStatus
+  paymentMethod: PaymentMethod
+  paymentStatus: PaymentStatus
+  paidAmount: number
+  notes?: string
+  saleDate: Date
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface SaleItem {
+  id: string
+  saleId: string
+  productId: string
+  quantity: number
+  unitPrice: number
+  totalPrice: number
+}
+
+export interface Payment {
+  id: string
+  saleId: string
+  amount: number
+  method: PaymentMethod
+  status: PaymentStatus
+  transactionId?: string
+  reference?: string
+  notes?: string
+  paymentDate: Date
+  createdAt: Date
+}
+
+export interface Loan {
+  id: string
+  customerId: string
+  loanNumber: string
+  principalAmount: number
+  interestRate: number
+  totalAmount: number
+  paidAmount: number
+  remainingAmount: number
+  installmentAmount: number
+  totalInstallments: number
+  paidInstallments: number
+  status: LoanStatus
+  startDate: Date
+  endDate: Date
+  nextDueDate?: Date
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface LoanInstallment {
+  id: string
+  loanId: string
+  installmentNo: number
+  amount: number
+  dueDate: Date
+  paidDate?: Date
+  paidAmount?: number
+  status: string
+  createdAt: Date
+}
+
+export interface DailyClosing {
+  id: string
+  date: Date
+  status: ClosingStatus
+  totalSales: number
+  totalCash: number
+  totalCard: number
+  totalDigital: number
+  openingCash: number
+  closingCash: number
+  cashDeposited: number
+  totalExpenses: number
+  expectedCash: number
+  actualCash: number
+  variance: number
+  notes?: string
+  closedAt?: Date
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface Expense {
+  id: string
+  dailyClosingId: string
+  category: string
+  description: string
+  amount: number
+  receipt?: string
+  expenseDate: Date
+  createdAt: Date
+}
+
+export interface SalesPrediction {
+  id: string
+  productId: string
+  predictionDate: Date
+  predictedSales: number
+  confidence: number
+  actualSales?: number
+  accuracy?: number
+  createdAt: Date
+}
+
+export interface CustomerInsight {
+  id: string
+  customerId: string
+  segment: string
+  lifetimeValue: number
+  averageOrderValue: number
+  purchaseFrequency: number
+  lastPurchase: Date
+  churnProbability: number
+  recommendations: any[]
+  updatedAt: Date
+}
+
+export interface StockRecommendation {
+  id: string
+  productId: string
+  currentStock: number
+  recommendedQty: number
+  reason: string
+  priority: string
+  confidence: number
+  isProcessed: boolean
+  createdAt: Date
+}
+
+export interface AuditLog {
+  id: string
+  userId: string
+  action: AuditAction
+  tableName: string
+  recordId: string
+  oldValues?: Record<string, any>
+  newValues?: Record<string, any>
+  ipAddress?: string
+  userAgent?: string
+  createdAt: Date
+}
+
+export interface ApprovalRequest {
+  id: string
+  workerId: string
+  shopOwnerId: string
+  type: ApprovalType
+  tableName: string
+  recordId: string
+  requestData: Record<string, any>
+  reason?: string
+  status: ApprovalStatus
+  approvedAt?: Date
+  approvedBy?: string
+  rejectionReason?: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+// API Response Types
+export interface ApiResponse<T = any> {
+  success: boolean
+  data?: T
+  message?: string
+  error?: string
+  pagination?: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+  }
+}
+
+// Permission Types
+export interface Permission {
+  resource: string
+  actions: string[]
+}
+
+export interface UserPermissions {
+  [resource: string]: string[]
+}
+
+// Dashboard Types
+export interface DashboardStats {
+  totalSales: number
+  totalRevenue: number
+  totalCustomers: number
+  totalProducts: number
+  dailyGrowth: number
+  weeklyGrowth: number
+  monthlyGrowth: number
+}
+
+// POS Types
+export interface CartItem {
+  product: Product
+  quantity: number
+  unitPrice: number
+  totalPrice: number
+  discount?: number
+}
+
+export interface Cart {
+  items: CartItem[]
+  subtotal: number
+  taxAmount: number
+  discountAmount: number
+  totalAmount: number
+}
+
+// Filter and Search Types
+export interface ProductFilter {
+  categoryId?: string
+  brandId?: string
+  type?: ProductType
+  status?: ProductStatus
+  priceRange?: {
+    min: number
+    max: number
+  }
+  search?: string
+  inStock?: boolean
+}
+
+export interface SaleFilter {
+  dateRange?: {
+    start: Date
+    end: Date
+  }
+  customerId?: string
+  status?: SaleStatus
+  paymentMethod?: PaymentMethod
+  minAmount?: number
+  maxAmount?: number
+}
+
+export interface PaginationParams {
+  page: number
+  limit: number
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
+}

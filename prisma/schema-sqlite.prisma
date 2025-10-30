@@ -1,0 +1,371 @@
+// Mobile Shop Management System - Prisma Schema (SQLite Development Version)
+// Simplified schema for development with SQLite compatibility
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ====================
+// AUTHENTICATION & USER MANAGEMENT
+// ====================
+
+enum UserRole {
+  SUPER_ADMIN
+  SHOP_OWNER
+  SHOP_WORKER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING
+}
+
+model User {
+  id          String     @id @default(cuid())
+  name        String
+  email       String     @unique
+  password    String
+  phone       String?
+  role        UserRole
+  status      UserStatus @default(ACTIVE)
+  lastLogin   DateTime?
+  
+  // Relationships
+  ownedShops  Shop[]     @relation("ShopOwner")
+  workerShops ShopWorker[]
+  
+  // Audit fields
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  createdBy   String?
+  updatedBy   String?
+
+  @@map("users")
+}
+
+// ====================
+// SHOP MANAGEMENT
+// ====================
+
+enum ShopStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+}
+
+model Shop {
+  id          String     @id @default(cuid())
+  name        String
+  code        String     @unique
+  address     String
+  city        String
+  province    String
+  postalCode  String?
+  phone       String?
+  email       String?
+  status      ShopStatus @default(ACTIVE)
+  
+  // Owner relationship
+  ownerId     String?
+  owner       User?      @relation("ShopOwner", fields: [ownerId], references: [id])
+  
+  // Settings (stored as JSON in SQLite)
+  settings    String     @default("{}")
+  
+  // Workers
+  workers     ShopWorker[]
+  
+  // Business data
+  categories  Category[]
+  products    Product[]
+  inventory   Inventory[]
+  suppliers   Supplier[]
+  customers   Customer[]
+  sales       Sale[]
+  
+  // Audit fields
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  createdBy   String?
+  updatedBy   String?
+
+  @@map("shops")
+}
+
+model ShopWorker {
+  id          String   @id @default(cuid())
+  shopId      String
+  workerId    String
+  permissions String   @default("{}") // JSON string
+  
+  shop        Shop     @relation(fields: [shopId], references: [id])
+  worker      User     @relation(fields: [workerId], references: [id])
+  
+  assignedAt  DateTime @default(now())
+  assignedBy  String
+
+  @@unique([shopId, workerId])
+  @@map("shop_workers")
+}
+
+// ====================
+// PRODUCT MANAGEMENT
+// ====================
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  code        String
+  description String?
+  parentId    String?
+  parent      Category? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryHierarchy")
+  
+  shopId      String
+  shop        Shop      @relation(fields: [shopId], references: [id])
+  
+  products    Product[]
+  isActive    Boolean   @default(true)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdBy   String
+
+  @@unique([shopId, code])
+  @@map("categories")
+}
+
+model Product {
+  id              String  @id @default(cuid())
+  name            String
+  code            String
+  barcode         String?
+  description     String?
+  
+  categoryId      String
+  category        Category @relation(fields: [categoryId], references: [id])
+  
+  brand           String?
+  model           String?
+  specifications  String  @default("{}") // JSON string
+  images          String  @default("[]") // JSON array as string
+  warranty        Int?    // Warranty period in months
+  
+  // Pricing (using Float for SQLite compatibility)
+  costPrice       Float
+  sellingPrice    Float
+  minimumPrice    Float?
+  markupPercentage Float?
+  
+  // Stock management
+  inventory       Inventory[]
+  saleItems       SaleItem[]
+  
+  isActive        Boolean @default(true)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdBy       String
+
+  @@unique([categoryId, code])
+  @@map("products")
+}
+
+model Inventory {
+  id                String  @id @default(cuid())
+  shopId           String
+  productId        String
+  
+  shop             Shop    @relation(fields: [shopId], references: [id])
+  product          Product @relation(fields: [productId], references: [id])
+  
+  quantity         Int     @default(0)
+  reservedQuantity Int     @default(0)
+  minStockLevel    Int     @default(0)
+  maxStockLevel    Int     @default(100)
+  
+  // Cost tracking (using Float for SQLite)
+  costPrice        Float
+  
+  lastUpdatedAt    DateTime @default(now())
+  lastUpdatedBy    String
+
+  @@unique([shopId, productId])
+  @@map("inventory")
+}
+
+// ====================
+// SUPPLIER MANAGEMENT
+// ====================
+
+model Supplier {
+  id            String  @id @default(cuid())
+  name          String
+  code          String
+  email         String?
+  phone         String?
+  address       String?
+  city          String?
+  contactPerson String?
+  contactPhone  String?
+  paymentTerms  String?
+  
+  shopId        String
+  shop          Shop    @relation(fields: [shopId], references: [id])
+  
+  // Credit terms (using Float for SQLite)
+  creditLimit   Float?
+  
+  isActive      Boolean @default(true)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdBy     String
+
+  @@unique([shopId, code])
+  @@map("suppliers")
+}
+
+// ====================
+// CUSTOMER MANAGEMENT
+// ====================
+
+model Customer {
+  id          String @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
+  address     String?
+  city        String?
+  
+  shopId      String
+  shop        Shop   @relation(fields: [shopId], references: [id])
+  
+  // Credit information (using Float for SQLite)
+  creditLimit Float? 
+  creditUsed  Float  @default(0)
+  
+  sales       Sale[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("customers")
+}
+
+// ====================
+// SALES MANAGEMENT
+// ====================
+
+enum SaleStatus {
+  DRAFT
+  COMPLETED
+  CANCELLED
+  RETURNED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  EASYPAISA
+  JAZZCASH
+  BANK_TRANSFER
+  INSTALLMENT
+}
+
+enum PaymentStatus {
+  PENDING
+  PARTIAL
+  PAID
+  OVERDUE
+}
+
+model Sale {
+  id              String        @id @default(cuid())
+  saleNumber      String        @unique
+  
+  shopId          String
+  shop            Shop          @relation(fields: [shopId], references: [id])
+  
+  customerId      String?
+  customer        Customer?     @relation(fields: [customerId], references: [id])
+  
+  // Sale details (using Float for SQLite)
+  subtotal        Float
+  taxAmount       Float         @default(0)
+  discountAmount  Float         @default(0)
+  totalAmount     Float
+  
+  status          SaleStatus    @default(DRAFT)
+  paymentMethod   PaymentMethod
+  paymentStatus   PaymentStatus @default(PENDING)
+  paidAmount      Float         @default(0)
+  
+  items           SaleItem[]
+  
+  saleDate        DateTime      @default(now())
+  createdBy       String
+
+  @@map("sales")
+}
+
+model SaleItem {
+  id          String  @id @default(cuid())
+  saleId      String
+  productId   String
+  
+  sale        Sale    @relation(fields: [saleId], references: [id])
+  product     Product @relation(fields: [productId], references: [id])
+  
+  quantity    Int
+  unitPrice   Float
+  totalPrice  Float
+  
+  createdAt   DateTime @default(now())
+
+  @@map("sale_items")
+}
+
+// ====================
+// AUDIT TRAIL
+// ====================
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  action      String   // CREATE, UPDATE, DELETE, LOGIN, etc.
+  tableName   String   // Table/model name
+  recordId    String?  // ID of the affected record
+  oldValues   String?  // JSON string of old values
+  newValues   String?  // JSON string of new values
+  ipAddress   String?
+  userAgent   String?
+  timestamp   DateTime @default(now())
+
+  @@map("audit_logs")
+}
+
+// ====================
+// SYSTEM SETTINGS
+// ====================
+
+model Setting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  category    String   @default("general")
+  
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?
+
+  @@map("settings")
+}

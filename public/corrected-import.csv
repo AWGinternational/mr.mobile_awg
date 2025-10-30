@@ -1,0 +1,5 @@
+name,model,sku,barcode,description,costPrice,sellingPrice,minimumPrice,lowStockThreshold,reorderPoint,warranty,type,status,category,brand,stock
+iPhone 15 Pro Max,Pro Max,APP-IP15PM-256,1234567890123,Latest iPhone with titanium design,390000,420000,400000,2,5,12,MOBILE_PHONE,ACTIVE,Smartphones,Apple,5
+Samsung Galaxy S24 Ultra,Ultra,SAM-GS24U-256,2345678901234,Flagship Android phone,290000,310000,300000,1,3,12,MOBILE_PHONE,ACTIVE,Smartphones,Samsung,3
+Xiaomi 14 Pro,Pro,XIA-14P-256,3456789012345,High-end Xiaomi device,110000,120000,115000,3,7,12,MOBILE_PHONE,ACTIVE,Smartphones,Xiaomi,8
+Oppo Find X7 Pro,Find X7,OPP-FX7-256,4567890123456,Premium Oppo smartphone,85000,95000,90000,2,5,12,MOBILE_PHONE,ACTIVE,Smartphones,Oppo,4

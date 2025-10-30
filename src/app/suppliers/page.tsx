@@ -1,0 +1,720 @@
+'use client'
+
+import React, { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/hooks/use-auth'
+import { useNotify } from '@/hooks/use-notifications'
+import { useFormNavigation } from '@/hooks/use-form-navigation'
+import { ProtectedRoute } from '@/components/auth/protected-route'
+import { UserRole } from '@/types'
+import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { BusinessSidebar } from '@/components/layout/BusinessSidebar'
+import { TopNavigation } from '@/components/layout/TopNavigation'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Truck,
+  ArrowLeft,
+  LogOut,
+  Search,
+  Plus,
+  Edit3,
+  Phone,
+  Mail,
+  MapPin,
+  ShoppingCart,
+  DollarSign,
+  X,
+  Loader2,
+  Trash2
+} from 'lucide-react'
+import { formatUserRole } from '@/utils/user-formatting'
+
+interface Supplier {
+  id: string
+  name: string
+  contactPerson: string
+  phone: string
+  email?: string
+  address: string
+  city: string
+  province: string
+  gstNumber?: string
+  creditLimit?: number
+  creditDays?: number
+  status: string
+  totalOrders: number
+  totalPaid: number
+  totalDue?: number
+  _count?: {
+    purchases: number
+    inventoryItems: number
+  }
+}
+
+export default function SupplierManagementPage() {
+  const router = useRouter()
+  const { user: currentUser, logout } = useAuth()
+  const { success, error: showError } = useNotify()
+  const { handleNavigationKeys } = useFormNavigation()
+  const [searchTerm, setSearchTerm] = useState('')
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [showEditDialog, setShowEditDialog] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [loading, setLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState(false)
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null)
+  const [formData, setFormData] = useState({
+    name: '',
+    contactPerson: '',
+    phone: '',
+    email: '',
+    address: '',
+    city: '',
+    province: '',
+    gstNumber: '',
+    creditLimit: '',
+    creditDays: '30',
+    status: 'ACTIVE'
+  })
+
+  useEffect(() => {
+    fetchSuppliers()
+  }, [searchTerm])
+
+  const fetchSuppliers = async () => {
+    try {
+      setLoading(true)
+      const params = new URLSearchParams()
+      if (searchTerm) params.append('search', searchTerm)
+      params.append('_t', Date.now().toString()) // Cache-busting
+      
+      const response = await fetch(`/api/suppliers?${params}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      })
+      const data = await response.json()
+      
+      if (data.success) {
+        setSuppliers(data.data.suppliers)
+      } else {
+        showError(data.error || 'Failed to fetch suppliers')
+      }
+    } catch (error) {
+      console.error('Fetch suppliers error:', error)
+      showError('Failed to fetch suppliers')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCreate = async () => {
+    try {
+      setActionLoading(true)
+      const response = await fetch('/api/suppliers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        success('Supplier created successfully')
+        setShowCreateDialog(false)
+        resetForm()
+        fetchSuppliers()
+      } else {
+        showError(data.error || 'Failed to create supplier')
+      }
+    } catch (error) {
+      console.error('Create supplier error:', error)
+      showError('Failed to create supplier')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleEdit = (supplier: Supplier) => {
+    setSelectedSupplier(supplier)
+    setFormData({
+      name: supplier.name,
+      contactPerson: supplier.contactPerson,
+      phone: supplier.phone,
+      email: supplier.email || '',
+      address: supplier.address,
+      city: supplier.city,
+      province: supplier.province,
+      gstNumber: supplier.gstNumber || '',
+      creditLimit: supplier.creditLimit?.toString() || '',
+      creditDays: supplier.creditDays?.toString() || '30',
+      status: supplier.status
+    })
+    setShowEditDialog(true)
+  }
+
+  const handleUpdate = async () => {
+    if (!selectedSupplier) return
+    
+    try {
+      setActionLoading(true)
+      const response = await fetch(`/api/suppliers/${selectedSupplier.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        success('Supplier updated successfully')
+        setShowEditDialog(false)
+        setSelectedSupplier(null)
+        resetForm()
+        fetchSuppliers()
+      } else {
+        showError(data.error || 'Failed to update supplier')
+      }
+    } catch (error) {
+      console.error('Update supplier error:', error)
+      showError('Failed to update supplier')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleDelete = (supplier: Supplier) => {
+    setSelectedSupplier(supplier)
+    setShowDeleteDialog(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!selectedSupplier) return
+    
+    try {
+      setActionLoading(true)
+      const response = await fetch(`/api/suppliers/${selectedSupplier.id}`, {
+        method: 'DELETE'
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        success('Supplier deleted successfully')
+        setShowDeleteDialog(false)
+        setSelectedSupplier(null)
+        fetchSuppliers()
+      } else {
+        showError(data.error || 'Failed to delete supplier')
+      }
+    } catch (error) {
+      console.error('Delete supplier error:', error)
+      showError('Failed to delete supplier')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      contactPerson: '',
+      phone: '',
+      email: '',
+      address: '',
+      city: '',
+      province: '',
+      gstNumber: '',
+      creditLimit: '',
+      creditDays: '30',
+      status: 'ACTIVE'
+    })
+  }
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+      router.push('/login')
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
+  }
+
+  const handleBack = () => {
+    if (currentUser?.role === UserRole.SUPER_ADMIN) router.push('/dashboard/admin')
+    else if (currentUser?.role === UserRole.SHOP_OWNER) router.push('/dashboard/owner')
+    else router.push('/dashboard/worker')
+  }
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0 }).format(amount)
+  }
+
+  const stats = {
+    total: suppliers.length,
+    active: suppliers.filter(s => s.status === 'ACTIVE').length,
+    totalPaid: suppliers.reduce((sum, s) => sum + (s.totalPaid || 0), 0),
+    totalOrders: suppliers.reduce((sum, s) => sum + (s.totalOrders || 0), 0)
+  }
+
+  return (
+    <ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.SHOP_OWNER, UserRole.SHOP_WORKER]}>
+      <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
+        <BusinessSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <div className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ${sidebarOpen ? 'lg:ml-20' : 'lg:ml-64'}`}>
+          <TopNavigation onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
+          
+          <div className="flex-1 bg-gray-50 dark:bg-gray-900">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-orange-600 to-orange-700 text-white">
+              <div className="px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
+                    <button 
+                      onClick={handleBack} 
+                      className="p-2 sm:p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-all duration-200 shrink-0"
+                    >
+                      <ArrowLeft className="h-5 w-5 text-white" />
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-1 sm:mb-2 truncate">🚚 Supplier Management</h1>
+                      <p className="text-orange-100 text-sm sm:text-base lg:text-lg">Vendor relationships and purchase orders</p>
+                    </div>
+                  </div>
+                  <Button 
+                    onClick={() => setShowCreateDialog(true)} 
+                    className="bg-white text-orange-600 hover:bg-orange-50 w-full sm:w-auto h-9 sm:h-10"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Supplier
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 space-y-4 sm:space-y-6 lg:space-y-8">
+              {/* Statistics */}
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+                <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg">
+                  <CardContent className="p-4 sm:p-6">
+                    <Truck className="h-6 w-6 sm:h-8 sm:w-8 mb-2 text-white opacity-90" />
+                    <p className="text-white opacity-90 text-xs sm:text-sm">Total Suppliers</p>
+                    <p className="text-2xl sm:text-3xl font-bold">{stats.total}</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg">
+                  <CardContent className="p-4 sm:p-6">
+                    <ShoppingCart className="h-6 w-6 sm:h-8 sm:w-8 mb-2 text-white opacity-90" />
+                    <p className="text-white opacity-90 text-xs sm:text-sm">Total Orders</p>
+                    <p className="text-2xl sm:text-3xl font-bold">{stats.totalOrders}</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white shadow-lg">
+                  <CardContent className="p-4 sm:p-6">
+                    <DollarSign className="h-6 w-6 sm:h-8 sm:w-8 mb-2 text-white opacity-90" />
+                    <p className="text-white opacity-90 text-xs sm:text-sm">Total Paid</p>
+                    <p className="text-lg sm:text-xl font-bold">{formatCurrency(stats.totalPaid)}</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-gray-500 to-gray-600 text-white shadow-lg">
+                  <CardContent className="p-4 sm:p-6">
+                    <Truck className="h-6 w-6 sm:h-8 sm:w-8 mb-2 text-white opacity-90" />
+                    <p className="text-white opacity-90 text-xs sm:text-sm">Active</p>
+                    <p className="text-2xl sm:text-3xl font-bold">{stats.active}</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Search Bar */}
+              <Card>
+                <CardContent className="p-4 sm:p-6">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 sm:left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400 dark:text-gray-500" />
+                    <Input
+                      type="text"
+                      placeholder="Search suppliers..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-8 sm:pl-10 h-9 sm:h-10 text-sm sm:text-base"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Suppliers List */}
+              <Card>
+                <CardContent className="p-4 sm:p-6">
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-4 sm:mb-6">Supplier Directory</h3>
+              
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-gray-400 dark:text-gray-500" />
+                  <span className="ml-2 text-gray-500 dark:text-gray-400">Loading suppliers...</span>
+                </div>
+              ) : suppliers.length === 0 ? (
+                <div className="text-center py-12">
+                  <Truck className="h-16 w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                  <p className="text-gray-500 dark:text-gray-400">No suppliers found</p>
+                  <Button onClick={() => setShowCreateDialog(true)} className="mt-4">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add First Supplier
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3 sm:space-y-4">
+                  {suppliers.map((supplier) => (
+                    <div key={supplier.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4 hover:border-orange-300 dark:hover:border-orange-500 hover:shadow-md transition-all">
+                      <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+                        {/* Icon & Main Info */}
+                        <div className="flex items-start gap-3 flex-1 w-full">
+                          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center shadow-md shrink-0">
+                            <Truck className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-gray-900 dark:text-white mb-1 truncate text-sm sm:text-base">{supplier.name}</h4>
+                            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2 truncate">Contact: {supplier.contactPerson}</p>
+                            <div className="space-y-1">
+                              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                                <Phone className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                                <span className="truncate">{supplier.phone}</span>
+                              </p>
+                              {supplier.email && (
+                                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                                  <Mail className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                                  <span className="truncate">{supplier.email}</span>
+                                </p>
+                              )}
+                              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                                <MapPin className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                                <span className="truncate">{supplier.address}, {supplier.city}, {supplier.province}</span>
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Stats & Actions */}
+                        <div className="w-full sm:w-auto flex flex-row sm:flex-col justify-between sm:text-right gap-3 sm:gap-0">
+                          <div className="flex gap-3 sm:block">
+                            <div className="mb-0 sm:mb-3">
+                              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Orders</p>
+                              <p className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">{supplier.totalOrders || 0}</p>
+                            </div>
+                            <div className="mb-0 sm:mb-3">
+                              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Paid</p>
+                              <p className="text-sm sm:text-lg font-bold text-green-600 dark:text-green-400">{formatCurrency(supplier.totalPaid || 0)}</p>
+                            </div>
+                          </div>
+                          
+                          <div className="flex flex-col gap-2 items-end">
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEdit(supplier)}
+                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-blue-200 dark:border-blue-800 h-7 w-7 sm:h-8 sm:w-8 p-0"
+                              >
+                                <Edit3 className="h-3 w-3 sm:h-4 sm:w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDelete(supplier)}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800 h-7 w-7 sm:h-8 sm:w-8 p-0"
+                              >
+                                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                              </Button>
+                            </div>
+                            <Badge className={supplier.status === 'ACTIVE' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'}>
+                              {supplier.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+        </div>
+      </div>
+      </div>
+
+      {/* Create Supplier Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Supplier</DialogTitle>
+          </DialogHeader>
+          <form className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Company Name *</Label>
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                onKeyDown={handleNavigationKeys}
+                placeholder="Ali Mobile Distributors"
+                autoFocus
+                className="focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <Label>Contact Person *</Label>
+              <Input
+                value={formData.contactPerson}
+                onChange={(e) => setFormData({...formData, contactPerson: e.target.value})}
+                onKeyDown={handleNavigationKeys}
+                placeholder="Ahmed Khan"
+                className="focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <Label>Phone *</Label>
+              <Input
+                value={formData.phone}
+                onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                onKeyDown={handleNavigationKeys}
+                placeholder="+92 21 11223344"
+                className="focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <Label>Email</Label>
+              <Input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({...formData, email: e.target.value})}
+                onKeyDown={handleNavigationKeys}
+                placeholder="supplier@example.com"
+                className="focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="col-span-2">
+              <Label>Address *</Label>
+              <Input
+                value={formData.address}
+                onChange={(e) => setFormData({...formData, address: e.target.value})}
+                onKeyDown={handleNavigationKeys}
+                placeholder="Shop Address"
+                className="focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <Label>City *</Label>
+              <Input
+                value={formData.city}
+                onChange={(e) => setFormData({...formData, city: e.target.value})}
+                onKeyDown={handleNavigationKeys}
+                placeholder="Karachi"
+                className="focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <Label>Province *</Label>
+              <Input
+                value={formData.province}
+                onChange={(e) => setFormData({...formData, province: e.target.value})}
+                onKeyDown={handleNavigationKeys}
+                placeholder="Sindh"
+                className="focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <Label>GST Number</Label>
+              <Input
+                value={formData.gstNumber}
+                onChange={(e) => setFormData({...formData, gstNumber: e.target.value})}
+                onKeyDown={handleNavigationKeys}
+                placeholder="GST-123456"
+                className="focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <Label>Credit Limit (PKR)</Label>
+              <Input
+                type="number"
+                value={formData.creditLimit}
+                onChange={(e) => setFormData({...formData, creditLimit: e.target.value})}
+                onKeyDown={handleNavigationKeys}
+                placeholder="500000"
+                className="focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <Label>Credit Days</Label>
+              <Input
+                type="number"
+                value={formData.creditDays}
+                onChange={(e) => setFormData({...formData, creditDays: e.target.value})}
+                onKeyDown={handleNavigationKeys}
+                placeholder="30"
+                className="focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <Label>Status</Label>
+              <Select value={formData.status} onValueChange={(value) => setFormData({...formData, status: value})}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="INACTIVE">Inactive</SelectItem>
+                  <SelectItem value="BLOCKED">Blocked</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </form>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowCreateDialog(false); resetForm(); }}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreate} disabled={actionLoading}>
+              {actionLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Create Supplier
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Supplier Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Supplier</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Company Name *</Label>
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData({...formData, name: e.target.value})}
+              />
+            </div>
+            <div>
+              <Label>Contact Person *</Label>
+              <Input
+                value={formData.contactPerson}
+                onChange={(e) => setFormData({...formData, contactPerson: e.target.value})}
+              />
+            </div>
+            <div>
+              <Label>Phone *</Label>
+              <Input
+                value={formData.phone}
+                onChange={(e) => setFormData({...formData, phone: e.target.value})}
+              />
+            </div>
+            <div>
+              <Label>Email</Label>
+              <Input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({...formData, email: e.target.value})}
+              />
+            </div>
+            <div className="col-span-2">
+              <Label>Address *</Label>
+              <Input
+                value={formData.address}
+                onChange={(e) => setFormData({...formData, address: e.target.value})}
+              />
+            </div>
+            <div>
+              <Label>City *</Label>
+              <Input
+                value={formData.city}
+                onChange={(e) => setFormData({...formData, city: e.target.value})}
+              />
+            </div>
+            <div>
+              <Label>Province *</Label>
+              <Input
+                value={formData.province}
+                onChange={(e) => setFormData({...formData, province: e.target.value})}
+              />
+            </div>
+            <div>
+              <Label>GST Number</Label>
+              <Input
+                value={formData.gstNumber}
+                onChange={(e) => setFormData({...formData, gstNumber: e.target.value})}
+              />
+            </div>
+            <div>
+              <Label>Credit Limit (PKR)</Label>
+              <Input
+                type="number"
+                value={formData.creditLimit}
+                onChange={(e) => setFormData({...formData, creditLimit: e.target.value})}
+              />
+            </div>
+            <div>
+              <Label>Credit Days</Label>
+              <Input
+                type="number"
+                value={formData.creditDays}
+                onChange={(e) => setFormData({...formData, creditDays: e.target.value})}
+              />
+            </div>
+            <div>
+              <Label>Status</Label>
+              <Select value={formData.status} onValueChange={(value) => setFormData({...formData, status: value})}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="INACTIVE">Inactive</SelectItem>
+                  <SelectItem value="BLOCKED">Blocked</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowEditDialog(false); setSelectedSupplier(null); resetForm(); }}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdate} disabled={actionLoading}>
+              {actionLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Update Supplier
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Supplier Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Supplier</DialogTitle>
+          </DialogHeader>
+          <p>Are you sure you want to delete <strong>{selectedSupplier?.name}</strong>?</p>
+          <p className="text-sm text-red-600 mt-2">
+            Note: Suppliers with existing purchases or inventory items cannot be deleted. Set status to INACTIVE instead.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowDeleteDialog(false); setSelectedSupplier(null); }}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteConfirm} disabled={actionLoading}>
+              {actionLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </ProtectedRoute>
+  )
+}
+

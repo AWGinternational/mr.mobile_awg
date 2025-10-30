@@ -1,0 +1,1201 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { 
+  Building2, 
+  Plus, 
+  Users, 
+  MapPin, 
+  Phone, 
+  Mail, 
+  Settings, 
+  Activity,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  Search,
+  Filter,
+  Loader2,
+  ArrowLeft,
+  Home
+} from 'lucide-react'
+import { ShopWithDetails, ShopOwner, CreateShopInput, ShopListResponse, ShopOwnersListResponse } from '@/types/shop'
+
+// Helper functions for status handling
+const getStatusBadge = (status: string) => {
+  const variants = {
+    ACTIVE: 'bg-green-100 text-green-800',
+    INACTIVE: 'bg-gray-100 text-gray-800',
+    SUSPENDED: 'bg-red-100 text-red-800'
+  }
+  return variants[status as keyof typeof variants] || variants.INACTIVE
+}
+
+const getStatusIcon = (status: string) => {
+  switch (status) {
+    case 'ACTIVE':
+      return <CheckCircle className="h-4 w-4" />
+    case 'SUSPENDED':
+      return <AlertCircle className="h-4 w-4" />
+    default:
+      return <Clock className="h-4 w-4" />
+  }
+}
+
+export default function ShopManagementDashboard() {
+  const { data: session } = useSession()
+  const [shops, setShops] = useState<ShopWithDetails[]>([])
+  const [shopOwners, setShopOwners] = useState<ShopOwner[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [selectedShop, setSelectedShop] = useState<ShopWithDetails | null>(null)
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [showCreateOwnerDialog, setShowCreateOwnerDialog] = useState(false)
+  const [filters, setFilters] = useState({
+    search: '',
+    status: '',
+    city: '',
+    province: ''
+  })
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+
+  const getStatusBadge = (status: string) => {
+    const variants = {
+      ACTIVE: 'bg-green-100 text-green-800',
+      INACTIVE: 'bg-gray-100 text-gray-800',
+      SUSPENDED: 'bg-red-100 text-red-800'
+    }
+    return variants[status as keyof typeof variants] || variants.INACTIVE
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'ACTIVE':
+        return <CheckCircle className="h-4 w-4" />
+      case 'SUSPENDED':
+        return <AlertCircle className="h-4 w-4" />
+      default:
+        return <Clock className="h-4 w-4" />
+    }
+  }
+
+  useEffect(() => {
+    fetchShops()
+    if (session?.user?.role === 'SUPER_ADMIN') {
+      fetchShopOwners()
+    }
+  }, [currentPage, filters, session])
+
+  const fetchShops = async () => {
+    try {
+      setLoading(true)
+      const queryParams = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: '10',
+        ...(filters.status && filters.status !== 'all' && { status: filters.status }),
+        ...(filters.city && { city: filters.city }),
+        ...(filters.province && filters.province !== 'all' && { province: filters.province })
+      })
+
+      const response = await fetch(`/api/shops?${queryParams}`)
+      if (!response.ok) throw new Error('Failed to fetch shops')
+      
+      const data: ShopListResponse = await response.json()
+      setShops(data.shops)
+      setTotalPages(data.pagination.pages)
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch shops')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchShopOwners = async () => {
+    try {
+      const response = await fetch('/api/users/shop-owners?includeShopCounts=true')
+      if (!response.ok) throw new Error('Failed to fetch shop owners')
+      
+      const data: ShopOwnersListResponse = await response.json()
+      setShopOwners(data.shopOwners)
+    } catch (err) {
+      console.error('Failed to fetch shop owners:', err)
+    }
+  }
+
+  // Filter shops based on search
+  const filteredShops = shops.filter(shop => {
+    if (!filters.search) return true
+    const searchLower = filters.search.toLowerCase()
+    return (
+      shop.name.toLowerCase().includes(searchLower) ||
+      shop.code.toLowerCase().includes(searchLower) ||
+      shop.city.toLowerCase().includes(searchLower) ||
+      shop.owner.name.toLowerCase().includes(searchLower)
+    )
+  })
+
+  if (loading && shops.length === 0) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading shops...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Navigation Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => window.history.back()}
+              className="flex items-center space-x-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back</span>
+            </Button>
+            <div className="flex items-center space-x-2 text-sm text-gray-600">
+              <Home className="h-4 w-4" />
+              <span>Dashboard</span>
+              <span>/</span>
+              <span className="font-medium text-gray-900">Shop Management</span>
+            </div>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => {
+              if (session?.user?.role === 'SUPER_ADMIN') {
+                window.location.href = '/dashboard/admin'
+              } else if (session?.user?.role === 'SHOP_OWNER') {
+                window.location.href = '/dashboard/owner'
+              } else {
+                window.location.href = '/dashboard'
+              }
+            }}
+            className="flex items-center space-x-2"
+          >
+            <Home className="h-4 w-4" />
+            <span>Dashboard</span>
+          </Button>
+        </div>
+      </div>
+
+      <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Shop Management</h1>
+          <p className="text-gray-600 mt-1">
+            {session?.user?.role === 'SUPER_ADMIN' 
+              ? 'Manage all shops in the system'
+              : session?.user?.role === 'SHOP_OWNER'
+              ? 'Manage your shops'
+              : 'View assigned shops'
+            }
+          </p>
+        </div>
+        
+        {session?.user?.role === 'SUPER_ADMIN' && (
+          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+            <DialogTrigger asChild>
+              <Button className="bg-blue-600 hover:bg-blue-700">
+                <Plus className="h-4 w-4 mr-2" />
+                Create New Shop
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Create New Shop</DialogTitle>
+                <DialogDescription>
+                  Add a new shop to the system and assign it to a shop owner.
+                </DialogDescription>
+              </DialogHeader>
+              <CreateShopForm 
+                shopOwners={shopOwners}
+                onSuccess={() => {
+                  setShowCreateDialog(false)
+                  fetchShops()
+                }}
+                onOpenCreateOwnerDialog={() => setShowCreateOwnerDialog(true)}
+              />
+            </DialogContent>
+          </Dialog>
+        )}
+      </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Filters</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <Label htmlFor="search">Search</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  id="search"
+                  placeholder="Search shops, owners..."
+                  value={filters.search}
+                  onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <Label htmlFor="status">Status</Label>
+              <Select value={filters.status} onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="INACTIVE">Inactive</SelectItem>
+                  <SelectItem value="SUSPENDED">Suspended</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="city">City</Label>
+              <Input
+                id="city"
+                placeholder="Filter by city"
+                value={filters.city}
+                onChange={(e) => setFilters(prev => ({ ...prev, city: e.target.value }))}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="province">Province</Label>
+              <Select value={filters.province} onValueChange={(value) => setFilters(prev => ({ ...prev, province: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All provinces" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All provinces</SelectItem>
+                  <SelectItem value="Punjab">Punjab</SelectItem>
+                  <SelectItem value="Sindh">Sindh</SelectItem>
+                  <SelectItem value="KPK">KPK</SelectItem>
+                  <SelectItem value="Balochistan">Balochistan</SelectItem>
+                  <SelectItem value="Islamabad">Islamabad</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Shops Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        {filteredShops.map((shop) => (
+          <Card key={shop.id} className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setSelectedShop(shop)}>
+            <CardHeader>
+              <div className="flex items-start justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Building2 className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg font-semibold">{shop.name}</CardTitle>
+                    <CardDescription className="font-mono text-sm">{shop.code}</CardDescription>
+                  </div>
+                </div>
+                <Badge className={getStatusBadge(shop.status)}>
+                  <div className="flex items-center space-x-1">
+                    {getStatusIcon(shop.status)}
+                    <span>{shop.status}</span>
+                  </div>
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex items-center text-sm text-gray-600">
+                  <MapPin className="h-4 w-4 mr-2" />
+                  <span>{shop.city}, {shop.province}</span>
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <Phone className="h-4 w-4 mr-2" />
+                  <span>{shop.phone}</span>
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <Mail className="h-4 w-4 mr-2" />
+                  <span>{shop.email}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center text-gray-600">
+                    <Users className="h-4 w-4 mr-1" />
+                    <span>{shop._count.workers} workers</span>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium">{shop.owner.name}</p>
+                    <p className="text-xs text-gray-500">{shop.owner.businessName}</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {filteredShops.length === 0 && !loading && (
+        <Card>
+          <CardContent className="text-center py-12">
+            <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No shops found</h3>
+            <p className="text-gray-600 mb-4">
+              {filters.search || filters.status || filters.city || filters.province
+                ? 'No shops match your current filters.'
+                : 'There are no shops in the system yet.'
+              }
+            </p>
+            {session?.user?.role === 'SUPER_ADMIN' && (
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create First Shop
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center space-x-2">
+          <Button
+            variant="outline"
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+          >
+            Previous
+          </Button>
+          <span className="text-sm text-gray-600">
+            Page {currentPage} of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+          >
+            Next
+          </Button>
+        </div>
+      )}
+
+      {/* Shop Details Dialog */}
+      {selectedShop && (
+        <ShopDetailsDialog
+          shop={selectedShop}
+          open={!!selectedShop}
+          onClose={() => setSelectedShop(null)}
+          onUpdate={fetchShops}
+        />
+      )}
+
+      {/* Create Shop Owner Dialog */}
+      <CreateShopOwnerDialog
+        open={showCreateOwnerDialog}
+        onClose={() => setShowCreateOwnerDialog(false)}
+        onSuccess={(newOwner) => {
+          setShopOwners(prev => [...prev, newOwner])
+          setShowCreateOwnerDialog(false)
+        }}
+      />
+    </div>
+  )
+}
+
+// Create Shop Form Component
+function CreateShopForm({ 
+  shopOwners, 
+  onSuccess,
+  onOpenCreateOwnerDialog
+}: { 
+  shopOwners: ShopOwner[]
+  onSuccess: () => void
+  onOpenCreateOwnerDialog: () => void
+}) {
+  const [formData, setFormData] = useState<CreateShopInput>({
+    name: '',
+    address: '',
+    city: '',
+    province: '',
+    postalCode: '',
+    phone: '',
+    email: '',
+    licenseNumber: '',
+    gstNumber: '',
+    ownerId: '',
+    settings: {
+      currency: 'PKR',
+      timezone: 'Asia/Karachi',
+      gstRate: 17,
+      maxWorkers: 2,
+      businessHours: {
+        open: '09:00',
+        close: '21:00',
+        days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+      }
+    }
+  })
+  const [loading, setLoading] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setErrors({})
+
+    try {
+      const response = await fetch('/api/shops', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        if (error.details) {
+          const fieldErrors: Record<string, string> = {}
+          error.details.forEach((detail: any) => {
+            fieldErrors[detail.path[0]] = detail.message
+          })
+          setErrors(fieldErrors)
+        } else {
+          throw new Error(error.error || 'Failed to create shop')
+        }
+        return
+      }
+
+      onSuccess()
+    } catch (err) {
+      setErrors({ general: err instanceof Error ? err.message : 'Failed to create shop' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {errors.general && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{errors.general}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="name">Shop Name *</Label>
+          <Input
+            id="name"
+            value={formData.name}
+            onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+            placeholder="Enter shop name"
+            className={errors.name ? 'border-red-500' : ''}
+          />
+          {errors.name && <p className="text-sm text-red-500 mt-1">{errors.name}</p>}
+        </div>
+
+        <div>
+          <Label htmlFor="ownerId">Shop Owner *</Label>
+          <div className="space-y-2">
+            <Select value={formData.ownerId} onValueChange={(value) => setFormData(prev => ({ ...prev, ownerId: value }))}>
+              <SelectTrigger className={errors.ownerId ? 'border-red-500' : ''}>
+                <SelectValue placeholder="Select shop owner" />
+              </SelectTrigger>
+              <SelectContent>
+                {shopOwners.map((owner) => (
+                  <SelectItem key={owner.id} value={owner.id}>
+                    {owner.name} ({owner.businessName || 'No business name'})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={() => onOpenCreateOwnerDialog()}
+              className="w-full"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create New Shop Owner
+            </Button>
+          </div>
+          {errors.ownerId && <p className="text-sm text-red-500 mt-1">{errors.ownerId}</p>}
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="address">Address *</Label>
+        <Input
+          id="address"
+          value={formData.address}
+          onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+          placeholder="Enter complete address"
+          className={errors.address ? 'border-red-500' : ''}
+        />
+        {errors.address && <p className="text-sm text-red-500 mt-1">{errors.address}</p>}
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div>
+          <Label htmlFor="city">City *</Label>
+          <Input
+            id="city"
+            value={formData.city}
+            onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
+            placeholder="City"
+            className={errors.city ? 'border-red-500' : ''}
+          />
+          {errors.city && <p className="text-sm text-red-500 mt-1">{errors.city}</p>}
+        </div>
+
+        <div>
+          <Label htmlFor="province">Province *</Label>
+          <Select value={formData.province} onValueChange={(value) => setFormData(prev => ({ ...prev, province: value }))}>
+            <SelectTrigger className={errors.province ? 'border-red-500' : ''}>
+              <SelectValue placeholder="Province" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Punjab">Punjab</SelectItem>
+              <SelectItem value="Sindh">Sindh</SelectItem>
+              <SelectItem value="KPK">KPK</SelectItem>
+              <SelectItem value="Balochistan">Balochistan</SelectItem>
+              <SelectItem value="Islamabad">Islamabad</SelectItem>
+            </SelectContent>
+          </Select>
+          {errors.province && <p className="text-sm text-red-500 mt-1">{errors.province}</p>}
+        </div>
+
+        <div>
+          <Label htmlFor="postalCode">Postal Code *</Label>
+          <Input
+            id="postalCode"
+            value={formData.postalCode}
+            onChange={(e) => setFormData(prev => ({ ...prev, postalCode: e.target.value }))}
+            placeholder="12345"
+            className={errors.postalCode ? 'border-red-500' : ''}
+          />
+          {errors.postalCode && <p className="text-sm text-red-500 mt-1">{errors.postalCode}</p>}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="phone">Phone *</Label>
+          <Input
+            id="phone"
+            value={formData.phone}
+            onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+            placeholder="+92-42-35741234"
+            className={errors.phone ? 'border-red-500' : ''}
+          />
+          {errors.phone && <p className="text-sm text-red-500 mt-1">{errors.phone}</p>}
+        </div>
+
+        <div>
+          <Label htmlFor="email">Email *</Label>
+          <Input
+            id="email"
+            type="email"
+            value={formData.email}
+            onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+            placeholder="shop@example.com"
+            className={errors.email ? 'border-red-500' : ''}
+          />
+          {errors.email && <p className="text-sm text-red-500 mt-1">{errors.email}</p>}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <div className="space-y-1">
+            <Label htmlFor="licenseNumber">Business License Number *</Label>
+            <p className="text-xs text-gray-500">
+              Trade license from local municipal authority (e.g., LHR-TRADE-2024-001)
+            </p>
+          </div>
+          <Input
+            id="licenseNumber"
+            value={formData.licenseNumber}
+            onChange={(e) => setFormData(prev => ({ ...prev, licenseNumber: e.target.value }))}
+            placeholder="LHR-TRADE-2024-001"
+            className={errors.licenseNumber ? 'border-red-500' : ''}
+          />
+          {errors.licenseNumber && <p className="text-sm text-red-500 mt-1">{errors.licenseNumber}</p>}
+        </div>
+
+        <div>
+          <div className="space-y-1">
+            <Label htmlFor="gstNumber">GST Registration Number *</Label>
+            <p className="text-xs text-gray-500">
+              Sales Tax registration for mobile phone business (e.g., 17-PKR-GST-001-2024)
+            </p>
+          </div>
+          <Input
+            id="gstNumber"
+            value={formData.gstNumber}
+            onChange={(e) => setFormData(prev => ({ ...prev, gstNumber: e.target.value }))}
+            placeholder="17-PKR-GST-001-2024"
+            className={errors.gstNumber ? 'border-red-500' : ''}
+          />
+          {errors.gstNumber && <p className="text-sm text-red-500 mt-1">{errors.gstNumber}</p>}
+        </div>
+      </div>
+
+      <div className="flex justify-end space-x-3 pt-4">
+        <Button type="button" variant="outline" onClick={() => onSuccess()}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={loading}>
+          {loading ? 'Creating...' : 'Create Shop'}
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+// Create New Shop Owner Dialog Component
+function CreateShopOwnerDialog({ 
+  open, 
+  onClose, 
+  onSuccess 
+}: { 
+  open: boolean
+  onClose: () => void
+  onSuccess: (newOwner: ShopOwner) => void
+}) {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    businessName: '',
+    address: '',
+    city: '',
+    province: '',
+    cnic: ''
+  })
+  const [loading, setLoading] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setErrors({})
+
+    try {
+      const response = await fetch('/api/users/shop-owners', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          role: 'SHOP_OWNER',
+          password: 'temp123' // Temporary password, user should change on first login
+        })
+      })
+
+      if (response.ok) {
+        const newOwner = await response.json()
+        onSuccess(newOwner)
+        onClose()
+        // Reset form
+        setFormData({
+          name: '',
+          email: '',
+          phone: '',
+          businessName: '',
+          address: '',
+          city: '',
+          province: '',
+          cnic: ''
+        })
+      } else {
+        const error = await response.json()
+        setErrors({ general: error.error || 'Failed to create shop owner' })
+      }
+    } catch (err) {
+      setErrors({ general: 'Failed to create shop owner' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Create New Shop Owner</DialogTitle>
+          <DialogDescription>
+            Add a new shop owner to the system. They will receive login credentials via email.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {errors.general && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{errors.general}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="ownerName">Full Name *</Label>
+              <Input
+                id="ownerName"
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Ahmed Khan"
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="ownerEmail">Email *</Label>
+              <Input
+                id="ownerEmail"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="ahmed@example.com"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="ownerPhone">Phone *</Label>
+              <Input
+                id="ownerPhone"
+                value={formData.phone}
+                onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                placeholder="+92-300-1234567"
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="ownerCnic">CNIC *</Label>
+              <Input
+                id="ownerCnic"
+                value={formData.cnic}
+                onChange={(e) => setFormData(prev => ({ ...prev, cnic: e.target.value }))}
+                placeholder="42101-1234567-8"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="ownerBusinessName">Business Name</Label>
+            <Input
+              id="ownerBusinessName"
+              value={formData.businessName}
+              onChange={(e) => setFormData(prev => ({ ...prev, businessName: e.target.value }))}
+              placeholder="Khan Mobile Center"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="ownerAddress">Address *</Label>
+            <Input
+              id="ownerAddress"
+              value={formData.address}
+              onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+              placeholder="Complete address"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="ownerCity">City *</Label>
+              <Input
+                id="ownerCity"
+                value={formData.city}
+                onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
+                placeholder="Lahore"
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="ownerProvince">Province *</Label>
+              <Select value={formData.province} onValueChange={(value) => setFormData(prev => ({ ...prev, province: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select province" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Punjab">Punjab</SelectItem>
+                  <SelectItem value="Sindh">Sindh</SelectItem>
+                  <SelectItem value="KPK">KPK</SelectItem>
+                  <SelectItem value="Balochistan">Balochistan</SelectItem>
+                  <SelectItem value="Islamabad">Islamabad</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Shop Owner'
+              )}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// Shop Details Dialog Component
+function ShopDetailsDialog({ 
+  shop, 
+  open, 
+  onClose, 
+  onUpdate 
+}: { 
+  shop: ShopWithDetails
+  open: boolean
+  onClose: () => void
+  onUpdate: () => void
+}) {
+  const [shopStats, setShopStats] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (open && shop) {
+      fetchShopStats()
+    }
+  }, [open, shop])
+
+  const fetchShopStats = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch(`/api/shops/${shop.id}/stats`)
+      if (response.ok) {
+        const stats = await response.json()
+        setShopStats(stats)
+      }
+    } catch (err) {
+      console.error('Failed to fetch shop stats:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center space-x-3">
+            <Building2 className="h-6 w-6" />
+            <span>{shop.name}</span>
+            <Badge className={getStatusBadge(shop.status)}>
+              {shop.status}
+            </Badge>
+          </DialogTitle>
+          <DialogDescription>
+            Shop Code: {shop.code} • {shop.city}, {shop.province}
+          </DialogDescription>
+        </DialogHeader>
+
+        <Tabs defaultValue="details" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="workers">Workers</TabsTrigger>
+            <TabsTrigger value="stats">Statistics</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="details" className="space-y-4">
+            <div className="grid grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Contact Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center">
+                    <MapPin className="h-4 w-4 mr-3 text-gray-500" />
+                    <div>
+                      <p className="font-medium">{shop.address}</p>
+                      <p className="text-sm text-gray-600">{shop.city}, {shop.province} {shop.postalCode}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <Phone className="h-4 w-4 mr-3 text-gray-500" />
+                    <span>{shop.phone}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Mail className="h-4 w-4 mr-3 text-gray-500" />
+                    <span>{shop.email}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Business Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-600">License Number</Label>
+                    <p>{shop.licenseNumber}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-600">GST Number</Label>
+                    <p>{shop.gstNumber}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-600">Created</Label>
+                    <p>{new Date(shop.createdAt).toLocaleDateString()}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Shop Owner</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center space-x-4">
+                  <div className="p-3 bg-blue-100 rounded-full">
+                    <Users className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium">{shop.owner.name}</p>
+                    <p className="text-sm text-gray-600">{shop.owner.email}</p>
+                    {shop.owner.businessName && (
+                      <p className="text-sm text-gray-600">{shop.owner.businessName}</p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Shop Settings</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-600">Currency</Label>
+                    <p>{shop.settings.currency}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-600">GST Rate</Label>
+                    <p>{shop.settings.gstRate}%</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-600">Max Workers</Label>
+                    <p>{shop.settings.maxWorkers}</p>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <Label className="text-sm font-medium text-gray-600">Business Hours</Label>
+                  <p>{shop.settings.businessHours.open} - {shop.settings.businessHours.close}</p>
+                  <p className="text-sm text-gray-600">
+                    {shop.settings.businessHours.days.join(', ')}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="workers" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Active Workers ({shop._count.workers})</h3>
+              <Badge variant="outline">
+                {shop._count.workers} / {shop.settings.maxWorkers}
+              </Badge>
+            </div>
+
+            {shop.workers.length === 0 ? (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Workers Assigned</h3>
+                  <p className="text-gray-600">This shop doesn't have any workers assigned yet.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {shop.workers.map((worker) => (
+                  <Card key={worker.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2 bg-green-100 rounded-full">
+                            <Users className="h-4 w-4 text-green-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{worker.user.name}</p>
+                            <p className="text-sm text-gray-600">{worker.user.email}</p>
+                            {worker.user.phone && (
+                              <p className="text-sm text-gray-600">{worker.user.phone}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <Badge className={worker.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                            {worker.isActive ? 'Active' : 'Inactive'}
+                          </Badge>
+                          <p className="text-sm text-gray-600 mt-1">
+                            Joined {new Date(worker.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                        <h4 className="text-sm font-medium mb-2">Permissions</h4>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div className="flex items-center space-x-2">
+                            <span className={worker.permissions.canHandleCash ? 'text-green-600' : 'text-gray-400'}>
+                              {worker.permissions.canHandleCash ? '✓' : '✗'}
+                            </span>
+                            <span>Handle Cash</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className={worker.permissions.canProcessReturns ? 'text-green-600' : 'text-gray-400'}>
+                              {worker.permissions.canProcessReturns ? '✓' : '✗'}
+                            </span>
+                            <span>Process Returns</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className={worker.permissions.canManageInventory ? 'text-green-600' : 'text-gray-400'}>
+                              {worker.permissions.canManageInventory ? '✓' : '✗'}
+                            </span>
+                            <span>Manage Inventory</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className={worker.permissions.canViewReports ? 'text-green-600' : 'text-gray-400'}>
+                              {worker.permissions.canViewReports ? '✓' : '✗'}
+                            </span>
+                            <span>View Reports</span>
+                          </div>
+                        </div>
+                        <div className="mt-2 text-sm text-gray-600">
+                          <p>Max Discount: {worker.permissions.maxDiscountPercent}%</p>
+                          <p>Daily Limit: PKR {worker.permissions.dailyTransactionLimit.toLocaleString()}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="stats" className="space-y-4">
+            {loading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p>Loading statistics...</p>
+              </div>
+            ) : shopStats ? (
+              <div className="grid grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Worker Statistics</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span>Total Workers:</span>
+                        <span className="font-medium">{shopStats.workers.total}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Active Workers:</span>
+                        <span className="font-medium">{shopStats.workers.active}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Capacity:</span>
+                        <span className="font-medium">{shopStats.workers.capacity}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Utilization:</span>
+                        <span className="font-medium">{shopStats.workers.utilization}%</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Activity</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span>Shop Age:</span>
+                        <span className="font-medium">{shopStats.shop.ageInDays} days</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Recent Activity:</span>
+                        <span className="font-medium">{shopStats.activity.recentAuditLogs} logs</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600">Failed to load statistics</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
+  )
+}

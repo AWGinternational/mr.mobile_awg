@@ -1,0 +1,113 @@
+# DigitalOcean App Platform Configuration
+# This file defines the infrastructure for your app
+
+name: mr-mobile
+region: sgp1  # Singapore - Closest to Pakistan
+
+# Web Service (Next.js Application)
+services:
+  - name: web
+    # Source Code Configuration
+    github:
+      repo: YOUR_GITHUB_USERNAME/mr.mobile  # Update with your GitHub repo
+      branch: main
+      deploy_on_push: true  # Auto-deploy on git push
+    
+    # Build Configuration
+    build_command: npm run build
+    run_command: npm start
+    
+    # Environment Variables (Add these in DigitalOcean Dashboard)
+    envs:
+      - key: NODE_ENV
+        value: production
+      
+      - key: DATABASE_URL
+        value: ${db.DATABASE_URL}  # Auto-populated from database below
+      
+      - key: NEXTAUTH_URL
+        value: ${APP_URL}  # Auto-populated with your app URL
+      
+      - key: NEXTAUTH_SECRET
+        scope: RUN_TIME
+        type: SECRET  # Encrypted in DO dashboard
+      
+      - key: UPSTASH_REDIS_REST_URL
+        scope: RUN_TIME
+        type: SECRET
+      
+      - key: UPSTASH_REDIS_REST_TOKEN
+        scope: RUN_TIME
+        type: SECRET
+      
+      - key: CLOUDINARY_CLOUD_NAME
+        scope: RUN_TIME
+      
+      - key: CLOUDINARY_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+      
+      - key: CLOUDINARY_API_SECRET
+        scope: RUN_TIME
+        type: SECRET
+      
+      - key: RESEND_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+      
+      - key: FROM_EMAIL
+        value: noreply@mrmobile.me
+    
+    # Instance Configuration
+    instance_count: 1
+    instance_size_slug: basic-xxs  # $5/month (1GB RAM, 1 vCPU)
+    
+    # HTTP Configuration
+    http_port: 3000
+    
+    # Health Check
+    health_check:
+      http_path: /api/health
+      initial_delay_seconds: 60
+      period_seconds: 30
+      timeout_seconds: 10
+      success_threshold: 1
+      failure_threshold: 3
+    
+    # Routes
+    routes:
+      - path: /
+    
+    # Dockerfile (Optional - remove if using buildpack)
+    # dockerfile_path: Dockerfile
+
+# Managed PostgreSQL Database
+databases:
+  - name: db
+    engine: PG
+    version: "15"
+    production: true
+    cluster_name: mr-mobile-db
+    db_name: mrmobile
+    db_user: mrmobile_user
+    size: db-s-1vcpu-1gb  # $15/month (1GB RAM, 1 vCPU, 10GB storage)
+    num_nodes: 1
+
+# Static Sites (Optional - if you want to serve static assets separately)
+# static_sites:
+#   - name: assets
+#     source_dir: public
+
+# Jobs (Optional - for background tasks)
+# jobs:
+#   - name: daily-backup
+#     kind: PRE_DEPLOY
+#     run_command: npm run backup
+#     envs:
+#       - key: DATABASE_URL
+#         value: ${db.DATABASE_URL}
+
+# Alerts (Optional)
+alerts:
+  - rule: DEPLOYMENT_FAILED
+  - rule: DOMAIN_FAILED

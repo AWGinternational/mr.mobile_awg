@@ -1,0 +1,2 @@
+name,model,sku,barcode,description,costPrice,sellingPrice,minimumPrice,lowStockThreshold,reorderPoint,warranty,type,status,category,brand
+Test Product,Test Model,TEST-001,123456789,Test description,100,150,120,5,10,12,PHONE,ACTIVE,Test Category,Test Brand
