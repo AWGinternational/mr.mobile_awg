@@ -20,7 +20,10 @@ import {
   Settings,
   LogOut,
   ChevronDown,
-  Menu
+  Menu,
+  ShoppingCart,
+  Wallet,
+  Calculator
 } from 'lucide-react'
 import { formatUserRole } from '@/utils/user-formatting'
 
@@ -86,8 +89,8 @@ export function TopNavigation({ onMenuClick }: TopNavigationProps = {}) {
     <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm">
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Left side - Hamburger menu for mobile */}
-          <div className="flex-1 flex items-center gap-4">
+          {/* Left side - Hamburger menu for mobile + Quick Actions */}
+          <div className="flex-1 flex items-center gap-2 sm:gap-4">
             {onMenuClick && (
               <Button
                 variant="ghost"
@@ -98,6 +101,39 @@ export function TopNavigation({ onMenuClick }: TopNavigationProps = {}) {
               >
                 <Menu className="h-6 w-6 text-gray-600 dark:text-gray-300" />
               </Button>
+            )}
+            
+            {/* Quick Actions - Always visible for easy access */}
+            {user && (user.role === 'SHOP_OWNER' || user.role === 'SHOP_WORKER') && (
+              <div className="hidden sm:flex items-center gap-1 ml-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/dashboard/pos')}
+                  className="bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 hover:from-blue-600 hover:to-blue-700 shadow-sm"
+                >
+                  <ShoppingCart className="h-4 w-4 mr-1" />
+                  POS
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/mobile-services')}
+                  className="bg-gradient-to-r from-green-500 to-green-600 text-white border-0 hover:from-green-600 hover:to-green-700 shadow-sm"
+                >
+                  <Wallet className="h-4 w-4 mr-1" />
+                  Service
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/daily-closing')}
+                  className="bg-gradient-to-r from-purple-500 to-purple-600 text-white border-0 hover:from-purple-600 hover:to-purple-700 shadow-sm"
+                >
+                  <Calculator className="h-4 w-4 mr-1" />
+                  Closing
+                </Button>
+              </div>
             )}
           </div>
 

@@ -467,10 +467,13 @@ export function BusinessSidebar({ isOpen = false, onClose }: SidebarProps) {
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-        <p className="text-xs text-gray-600 dark:text-gray-400 text-center">
-          Business Modules
+      {/* Footer - AWG International Branding */}
+      <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+        <p className="text-[10px] text-center text-gray-500 dark:text-gray-400">
+          © {new Date().getFullYear()} AWG International
+        </p>
+        <p className="text-[9px] text-center text-gray-400 dark:text-gray-500">
+          All Rights Reserved
         </p>
       </div>
     </div>
