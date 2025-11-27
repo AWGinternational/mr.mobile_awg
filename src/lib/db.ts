@@ -4,14 +4,37 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL,
+// Lazy initialization to prevent build-time errors when DATABASE_URL is not set
+function createPrismaClient(): PrismaClient {
+  // Check if DATABASE_URL is available
+  if (!process.env.DATABASE_URL) {
+    // During build time, return a mock or throw a clear error
+    console.warn('DATABASE_URL is not set. Prisma client will not be initialized.');
+    // Return a proxy that throws helpful errors when methods are called
+    return new Proxy({} as PrismaClient, {
+      get(target, prop) {
+        if (prop === '$connect' || prop === '$disconnect') {
+          return async () => {};
+        }
+        if (typeof prop === 'string' && !prop.startsWith('_')) {
+          throw new Error(`Database not configured. Please set DATABASE_URL environment variable.`);
+        }
+        return undefined;
+      }
+    });
+  }
+
+  return new PrismaClient({
+    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL,
+      },
     },
-  },
-})
+  });
+}
+
+export const prisma = globalForPrisma.prisma ?? createPrismaClient()
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
 

@@ -1,8 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Docker deployment: Enable standalone output for optimized container size
-  output: "standalone",
+  // Use standalone output only for Docker deployments
+  // Vercel automatically handles optimization
+  output: process.env.DOCKER_BUILD === 'true' ? "standalone" : undefined,
   
   // Disable static page generation for pages using useSearchParams
   // This prevents build errors with client-side routing
