@@ -184,25 +184,25 @@ export default function FeesSettingsPage() {
   }) => {
     return (
       <Card className="bg-white dark:bg-gray-800 dark:border-gray-700">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 dark:text-white">
-            <Icon className={`h-6 w-6 ${color}`} />
-            {service.serviceName}
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="flex items-center gap-2 dark:text-white text-base sm:text-lg">
+            <Icon className={`h-5 w-5 sm:h-6 sm:w-6 ${color} flex-shrink-0`} />
+            <span className="truncate">{service.serviceName}</span>
           </CardTitle>
-          <CardDescription className="dark:text-gray-400">
+          <CardDescription className="dark:text-gray-400 text-xs sm:text-sm mt-1">
             Configure commission for {service.serviceName}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6 pt-0">
           {/* Fee Type Toggle */}
-          <div className="flex items-center gap-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-            <Label className="text-sm font-medium dark:text-gray-300">Fee Type:</Label>
-            <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+            <Label className="text-xs sm:text-sm font-medium dark:text-gray-300 whitespace-nowrap">Fee Type:</Label>
+            <div className="flex gap-2 w-full sm:w-auto">
               <Button
                 variant={service.isPercentage ? "default" : "outline"}
                 size="sm"
                 onClick={() => handleServiceFeeChange(serviceKey, 'isPercentage', true)}
-                className="dark:border-gray-600"
+                className="dark:border-gray-600 flex-1 sm:flex-initial text-xs sm:text-sm"
               >
                 Percentage (%)
               </Button>
@@ -210,7 +210,7 @@ export default function FeesSettingsPage() {
                 variant={!service.isPercentage ? "default" : "outline"}
                 size="sm"
                 onClick={() => handleServiceFeeChange(serviceKey, 'isPercentage', false)}
-                className="dark:border-gray-600"
+                className="dark:border-gray-600 flex-1 sm:flex-initial text-xs sm:text-sm"
               >
                 Fixed (PKR)
               </Button>
@@ -219,7 +219,7 @@ export default function FeesSettingsPage() {
 
           {/* Fee Input */}
           <div>
-            <Label htmlFor={`${serviceKey}-fee`} className="dark:text-gray-300">
+            <Label htmlFor={`${serviceKey}-fee`} className="dark:text-gray-300 text-xs sm:text-sm">
               Service Fee {service.isPercentage ? '(%)' : '(PKR)'}
             </Label>
             <Input
@@ -230,9 +230,9 @@ export default function FeesSettingsPage() {
               value={service.fee === 0 ? '' : service.fee}
               placeholder={service.isPercentage ? "Enter percentage (e.g., 1.5)" : "Enter fixed amount (e.g., 50)"}
               onChange={(e) => handleServiceFeeChange(serviceKey, 'fee', parseFloat(e.target.value) || 0)}
-              className="mt-1 dark:bg-gray-900 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500"
+              className="mt-1.5 dark:bg-gray-900 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500 text-sm sm:text-base h-9 sm:h-10"
             />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
               {getServiceDescription(serviceKey)}
             </p>
           </div>
@@ -265,26 +265,26 @@ export default function FeesSettingsPage() {
           <div className="flex-1 bg-gray-50 dark:bg-gray-900">
             {/* Header */}
             <div className="bg-gradient-to-r from-green-600 to-emerald-700 dark:from-green-800 dark:to-emerald-900 text-white">
-              <div className="px-8 py-12">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-4">
-                    <button onClick={handleBack} className="p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-all duration-200">
-                      <ArrowLeft className="h-5 w-5 text-white" />
+              <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                    <button onClick={handleBack} className="p-2 sm:p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-all duration-200 flex-shrink-0">
+                      <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                     </button>
-                    <div>
-                      <h1 className="text-4xl font-bold mb-2">💰 Service Fees & Commission</h1>
-                      <p className="text-green-100 text-lg">
+                    <div className="min-w-0">
+                      <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-1 sm:mb-2 truncate">💰 Service Fees & Commission</h1>
+                      <p className="text-green-100 text-sm sm:text-base lg:text-lg truncate">
                         Configure fees for online banking and mobile money services
                       </p>
                     </div>
                   </div>
-                  <Wallet className="h-16 w-16 text-white/20" />
+                  <Wallet className="h-12 w-12 sm:h-16 sm:w-16 text-white/20 hidden sm:block flex-shrink-0" />
                 </div>
               </div>
             </div>
 
             {/* Content */}
-            <div className="px-8 py-8">
+            <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
               {loading ? (
                 <div className="text-center py-12">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
@@ -294,8 +294,8 @@ export default function FeesSettingsPage() {
                 <div className="space-y-6">
                   {/* Info Banner */}
                   <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-                    <CardContent className="p-4">
-                      <p className="text-sm text-blue-800 dark:text-blue-300">
+                    <CardContent className="p-3 sm:p-4">
+                      <p className="text-xs sm:text-sm text-blue-800 dark:text-blue-300">
                         ℹ️ <strong>Note:</strong> These fees will be applied to all online banking services in your shop. 
                         You can set fees as a percentage of the transaction or as a fixed PKR amount. 
                         These settings replace hardcoded values and give you full control over your pricing.
@@ -305,8 +305,8 @@ export default function FeesSettingsPage() {
 
                   {/* Service Fee Cards - All 7 Services */}
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Mobile Services</h3>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Mobile Services</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
                       <ServiceFeeCard 
                         service={fees.mobileLoad} 
                         serviceKey="mobileLoad" 
@@ -317,8 +317,8 @@ export default function FeesSettingsPage() {
                   </div>
 
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">EasyPaisa Services</h3>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">EasyPaisa Services</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                       <ServiceFeeCard 
                         service={fees.easypaisaSending} 
                         serviceKey="easypaisaSending" 
@@ -335,8 +335,8 @@ export default function FeesSettingsPage() {
                   </div>
 
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">JazzCash Services</h3>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">JazzCash Services</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                       <ServiceFeeCard 
                         service={fees.jazzcashSending} 
                         serviceKey="jazzcashSending" 
@@ -353,8 +353,8 @@ export default function FeesSettingsPage() {
                   </div>
 
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Banking Services</h3>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Banking Services</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                       <ServiceFeeCard 
                         service={fees.bankTransfer} 
                         serviceKey="bankTransfer" 
@@ -371,19 +371,20 @@ export default function FeesSettingsPage() {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex gap-4 justify-end pt-6 border-t dark:border-gray-700">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-end pt-4 sm:pt-6 border-t dark:border-gray-700">
                     <Button
                       variant="outline"
                       onClick={handleResetToDefaults}
-                      className="flex items-center gap-2 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                      className="flex items-center justify-center gap-2 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 w-full sm:w-auto text-sm sm:text-base"
                     >
                       <RotateCcw className="h-4 w-4" />
-                      Reset to Defaults
+                      <span className="hidden sm:inline">Reset to Defaults</span>
+                      <span className="sm:hidden">Reset</span>
                     </Button>
                     <Button
                       onClick={handleSaveFees}
                       disabled={saving}
-                      className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+                      className="flex items-center justify-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white w-full sm:w-auto text-sm sm:text-base"
                     >
                       {saving ? (
                         <>
@@ -393,7 +394,8 @@ export default function FeesSettingsPage() {
                       ) : (
                         <>
                           <Save className="h-4 w-4" />
-                          Save Fees Configuration
+                          <span className="hidden sm:inline">Save Fees Configuration</span>
+                          <span className="sm:hidden">Save</span>
                         </>
                       )}
                     </Button>
