@@ -219,12 +219,12 @@ function LoginContent() {
           <div className="text-center pt-2">
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Need access?{' '}
-              <Link 
-                href="/contact" 
+              <a 
+                href="mailto:abdulwahab01567@gmail.com?subject=Mr.%20Mobile%20-%20Access%20Request&body=Hello%20Admin%2C%0A%0AI%20would%20like%20to%20request%20access%20to%20the%20Mr.%20Mobile%20Shop%20Management%20System.%0A%0AMy%20Details%3A%0AName%3A%20%0APhone%3A%20%0AShop%20Name%3A%20%0A%0AThank%20you." 
                 className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
               >
                 Contact Administrator
-              </Link>
+              </a>
             </p>
           </div>
         </CardContent>
