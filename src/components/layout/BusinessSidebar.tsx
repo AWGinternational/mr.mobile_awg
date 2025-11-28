@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
+import Image from 'next/image'
 import { useAuth } from '@/hooks/use-auth'
 import { UserRole } from '@/types'
 import {
@@ -32,6 +33,25 @@ import {
   Clock,
   MessageSquare // 💬 MESSAGES ICON
 } from 'lucide-react'
+
+// Custom EasyPaisa Icon Component
+const EasyPaisaIcon = ({ className }: { className?: string }) => {
+  return (
+    <div className={`relative flex-shrink-0 ${className || 'h-5 w-5'}`}>
+      <Image
+        src="/images/services/easypaisa.png"
+        alt="EasyPaisa"
+        fill
+        sizes="20px"
+        className="object-contain"
+        onError={(e) => {
+          // Fallback to Banknote icon if image fails
+          e.currentTarget.style.display = 'none'
+        }}
+      />
+    </div>
+  )
+}
 
 interface SidebarProps {
   isOpen?: boolean
@@ -118,16 +138,6 @@ export function BusinessSidebar({ isOpen = false, onClose }: SidebarProps) {
       systemModule: 'MY_REQUESTS' // Worker-specific, always visible for workers
     },
     
-    // 1.6 Messages - Owner-Worker Communication (All users)
-    { 
-      name: 'Messages', 
-      icon: MessageSquare, 
-      path: '/dashboard/messages', 
-      color: 'text-indigo-600', 
-      bgColor: 'bg-indigo-50',
-      systemModule: 'MESSAGES' // Communication system, visible to all shop users
-    },
-    
     // 2. POS System - Main sales interface
     { 
       name: 'POS System', 
@@ -136,6 +146,32 @@ export function BusinessSidebar({ isOpen = false, onClose }: SidebarProps) {
       color: 'text-green-600', 
       bgColor: 'bg-green-50',
       systemModule: 'POS_SYSTEM'
+    },
+    
+    // 2.5 Online Banking - Mobile services and online banking fees
+    { 
+      name: 'Online Banking', 
+      icon: EasyPaisaIcon, 
+      color: 'text-emerald-600', 
+      bgColor: 'bg-emerald-50',
+      systemModule: 'SERVICE_MANAGEMENT',
+      subModules: [
+        { name: 'New Transaction', path: '/mobile-services', icon: Banknote },
+        { name: 'Transaction History', path: '/mobile-services/history', icon: FileText }
+      ]
+    },
+    
+    // 2.6 Daily Closing - End of day reconciliation
+    { 
+      name: 'Daily Closing', 
+      icon: DollarSign, 
+      color: 'text-green-600', 
+      bgColor: 'bg-green-50',
+      systemModule: 'DAILY_CLOSING',
+      subModules: [
+        { name: 'Create Closing', path: '/daily-closing', icon: DollarSign },
+        { name: 'View Records', path: '/daily-closing/records', icon: FileText }
+      ]
     },
     
     // 3. Products - Product catalog management
@@ -201,32 +237,6 @@ export function BusinessSidebar({ isOpen = false, onClose }: SidebarProps) {
       ]
     },
     
-    // 9. Daily Closing - End of day reconciliation
-    { 
-      name: 'Daily Closing', 
-      icon: DollarSign, 
-      color: 'text-green-600', 
-      bgColor: 'bg-green-50',
-      systemModule: 'DAILY_CLOSING',
-      subModules: [
-        { name: 'Create Closing', path: '/daily-closing', icon: DollarSign },
-        { name: 'View Records', path: '/daily-closing/records', icon: FileText }
-      ]
-    },
-    
-    // 10. Service Fees & Banking - Mobile services and online banking fees
-    { 
-      name: 'Service Fees & Banking', 
-      icon: Banknote, 
-      color: 'text-purple-600', 
-      bgColor: 'bg-purple-50',
-      systemModule: 'SERVICE_MANAGEMENT',
-      subModules: [
-        { name: 'New Transaction', path: '/mobile-services', icon: Banknote },
-        { name: 'Transaction History', path: '/mobile-services/history', icon: FileText }
-      ]
-    },
-    
     // 11. Payments - Payment tracking
     { 
       name: 'Payments', 
@@ -247,7 +257,17 @@ export function BusinessSidebar({ isOpen = false, onClose }: SidebarProps) {
       systemModule: 'LOAN_MANAGEMENT'
     },
     
-    // 13. Team Management - Worker management (Owner only)
+    // 13. Messages - Owner-Worker Communication (All users) - 3rd from last
+    { 
+      name: 'Messages', 
+      icon: MessageSquare, 
+      path: '/dashboard/messages', 
+      color: 'text-indigo-600', 
+      bgColor: 'bg-indigo-50',
+      systemModule: 'MESSAGES' // Communication system, visible to all shop users
+    },
+    
+    // 14. Team Management - Worker management (Owner only)
     { 
       name: 'Team', 
       icon: Users, 
@@ -261,7 +281,7 @@ export function BusinessSidebar({ isOpen = false, onClose }: SidebarProps) {
       ]
     },
     
-    // 14. Shop Settings - Configuration
+    // 15. Shop Settings - Configuration
     { 
       name: 'Shop Settings', 
       icon: Settings, 
@@ -409,6 +429,7 @@ export function BusinessSidebar({ isOpen = false, onClose }: SidebarProps) {
           const active = isModuleActive(module)
           const isExpanded = expandedModules.includes(module.name)
           const hasSubModules = module.subModules && module.subModules.length > 0
+          const isCustomIcon = module.name === 'Online Banking' // Check by module name for EasyPaisa icon
 
           return (
             <div key={module.name}>
@@ -427,7 +448,11 @@ export function BusinessSidebar({ isOpen = false, onClose }: SidebarProps) {
                     : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
-                <Icon className={`h-5 w-5 flex-shrink-0 ${active ? module.color : 'text-gray-600'}`} />
+                {isCustomIcon ? (
+                  <Icon className="h-5 w-5 flex-shrink-0" />
+                ) : (
+                  <Icon className={`h-5 w-5 flex-shrink-0 ${active ? module.color : 'text-gray-600 dark:text-gray-400'}`} />
+                )}
                 <span className="truncate text-sm flex-1 text-left">{module.name}</span>
                 {hasSubModules && (
                   isExpanded ? (

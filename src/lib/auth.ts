@@ -245,16 +245,21 @@ export const authOptions: NextAuthOptions = {
         token.status = (user as any).status
         token.shops = (user as any).shops
         token.phone = (user as any).phone
+        token.name = (user as any).name
         
         console.log('💾 Stored in JWT token:', {
           role: token.role,
           status: token.status,
-          phone: token.phone
+          phone: token.phone,
+          name: token.name
         })
       }
 
       // Handle session updates
       if (trigger === 'update' && session) {
+        // Update token with new session data
+        if (session.name) token.name = session.name
+        if (session.phone !== undefined) token.phone = session.phone
         return { ...token, ...session }
       }
 
@@ -274,10 +279,15 @@ export const authOptions: NextAuthOptions = {
         ;(session.user as any).status = token.status
         ;(session.user as any).shops = token.shops
         ;(session.user as any).phone = token.phone
+        // Update name if available in token
+        if (token.name) {
+          session.user.name = token.name as string
+        }
         
         console.log('📤 Session user object:', {
           id: session.user.id,
           email: session.user.email,
+          name: session.user.name,
           role: (session.user as any).role,
           status: (session.user as any).status
         })

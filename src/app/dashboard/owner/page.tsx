@@ -314,138 +314,141 @@ export default function ShopOwnerDashboard() {
             <>
           {/* Dashboard Header */}
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg">
-            <div className="px-8 py-8">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-4">
-                  <div className="bg-white/20 p-3 rounded-xl backdrop-blur-sm">
-                    <Store className="h-8 w-8 text-white" />
+            <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5 lg:py-6">
+              <div className="flex justify-between items-center gap-3">
+                <div className="flex items-center gap-2.5 sm:gap-3 lg:gap-4 min-w-0 flex-1">
+                  <div className="bg-white/20 p-2 sm:p-2.5 lg:p-3 rounded-xl backdrop-blur-sm flex-shrink-0">
+                    <Store className="h-5 w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8 text-white" />
                   </div>
-                  <div>
-                    <h1 className="text-3xl font-bold mb-1">{dashboardData.shop.name}</h1>
-                    <p className="text-blue-100 text-sm flex items-center gap-4">
-                      <span>📍 {dashboardData.shop.location}</span>
-                      <span>• GST: {dashboardData.shop.gstNumber}</span>
+                  <div className="min-w-0 flex-1">
+                    <h1 className="text-lg sm:text-xl lg:text-2xl font-bold mb-0.5 sm:mb-1 truncate">{dashboardData.shop.name}</h1>
+                    <p className="text-blue-100 text-xs sm:text-sm flex items-center gap-2 sm:gap-3 lg:gap-4">
+                      <span className="truncate">📍 {dashboardData.shop.location}</span>
                     </p>
                   </div>
                 </div>
                 <Button
                   onClick={fetchDashboardData}
                   variant="outline"
-                  className="bg-white/10 hover:bg-white/20 text-white border-white/30"
+                  size="sm"
+                  className="bg-white/10 hover:bg-white/20 active:bg-white/30 text-white border-white/30 h-8 sm:h-9 lg:h-10 px-2 sm:px-3 lg:px-4 flex-shrink-0 touch-manipulation"
                 >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Refresh
+                  <RefreshCw className="h-3 w-3 sm:h-3.5 sm:w-3.5 lg:h-4 lg:w-4 mr-1 sm:mr-1.5 lg:mr-2" />
+                  <span className="hidden sm:inline text-xs sm:text-sm">Refresh</span>
                 </Button>
               </div>
             </div>
           </div>
 
-          <div className="flex-1 px-8 py-8 space-y-8">
-            {/* Quick Stats with enhanced hover effects */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-              <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white shadow-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-300 cursor-pointer">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-green-100 text-sm font-medium">Today&apos;s Sales</p>
-                      <p className="text-4xl font-bold mt-2 tracking-tight">
-                        PKR {(dashboardData.today.sales / 1000).toFixed(1)}K
-                      </p>
-                      <p className="text-green-200 text-xs flex items-center mt-3">
-                        <TrendingUp className="h-3 w-3 mr-1" />
-                        {dashboardData.today.transactions} transactions today
-                      </p>
+          <div className="flex-1 px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 space-y-4 sm:space-y-6 lg:space-y-8">
+            {/* Quick Stats - 2 cards per row */}
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:gap-4">
+              <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-300 cursor-pointer">
+                <CardContent className="p-2.5 sm:p-3 lg:p-4">
+                  <div className="flex flex-col">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-green-100 text-xs font-medium">Today&apos;s Sales</p>
+                      <div className="bg-white/20 p-1.5 sm:p-2 rounded-lg backdrop-blur-sm flex-shrink-0">
+                        <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                      </div>
                     </div>
-                    <div className="bg-white/20 p-4 rounded-2xl backdrop-blur-sm">
-                      <DollarSign className="h-9 w-9 text-white" />
-                    </div>
+                    <p className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight mb-1">
+                      PKR {(dashboardData.today.sales / 1000).toFixed(1)}K
+                    </p>
+                    <p className="text-green-200 text-xs flex items-center">
+                      <TrendingUp className="h-3 w-3 mr-1 flex-shrink-0" />
+                      <span className="truncate">{dashboardData.today.transactions} transactions</span>
+                    </p>
                   </div>
                 </CardContent>
               </Card>
               
-              <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-300 cursor-pointer">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-blue-100 text-sm font-medium">Monthly Revenue</p>
-                      <p className="text-4xl font-bold mt-2 tracking-tight">
-                        PKR {(dashboardData.monthly.revenue / 1000).toFixed(0)}K
-                      </p>
-                      <p className="text-blue-200 text-xs flex items-center mt-3">
-                        <TrendingUp className="h-3 w-3 mr-1" />
-                        Profit: PKR {(dashboardData.monthly.profit / 1000).toFixed(1)}K
-                      </p>
+              <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-300 cursor-pointer">
+                <CardContent className="p-2.5 sm:p-3 lg:p-4">
+                  <div className="flex flex-col">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-blue-100 text-xs font-medium">Monthly Revenue</p>
+                      <div className="bg-white/20 p-1.5 sm:p-2 rounded-lg backdrop-blur-sm flex-shrink-0">
+                        <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                      </div>
                     </div>
-                    <div className="bg-white/20 p-4 rounded-2xl backdrop-blur-sm">
-                      <BarChart3 className="h-9 w-9 text-white" />
-                    </div>
+                    <p className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight mb-1">
+                      PKR {(dashboardData.monthly.revenue / 1000).toFixed(0)}K
+                    </p>
+                    <p className="text-blue-200 text-xs flex items-center">
+                      <TrendingUp className="h-3 w-3 mr-1 flex-shrink-0" />
+                      <span className="truncate">Profit: PKR {(dashboardData.monthly.profit / 1000).toFixed(1)}K</span>
+                    </p>
                   </div>
                 </CardContent>
               </Card>
               
-              <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-300 cursor-pointer">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-orange-100 text-sm font-medium">Inventory Status</p>
-                      <p className="text-4xl font-bold mt-2 tracking-tight">
-                        {dashboardData.inventory.inStock}
-                      </p>
-                      <p className="text-orange-200 text-xs flex items-center mt-3">
-                        <AlertTriangle className="h-3 w-3 mr-1" />
-                        {dashboardData.inventory.lowStock} low stock items
-                      </p>
+              <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-300 cursor-pointer">
+                <CardContent className="p-2.5 sm:p-3 lg:p-4">
+                  <div className="flex flex-col">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-orange-100 text-xs font-medium">Inventory</p>
+                      <div className="bg-white/20 p-1.5 sm:p-2 rounded-lg backdrop-blur-sm flex-shrink-0">
+                        <Package className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                      </div>
                     </div>
-                    <div className="bg-white/20 p-4 rounded-2xl backdrop-blur-sm">
-                      <Package className="h-9 w-9 text-white" />
-                    </div>
+                    <p className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight mb-1">
+                      {dashboardData.inventory.inStock}
+                    </p>
+                    <p className="text-orange-200 text-xs flex items-center">
+                      <AlertTriangle className="h-3 w-3 mr-1 flex-shrink-0" />
+                      <span className="truncate">{dashboardData.inventory.lowStock} low stock</span>
+                    </p>
                   </div>
                 </CardContent>
               </Card>
               
-              <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-300 cursor-pointer">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-purple-100 text-sm font-medium">Active Customers</p>
-                      <p className="text-4xl font-bold mt-2 tracking-tight">
-                        {dashboardData.customers.active}
-                      </p>
-                      <p className="text-purple-200 text-xs flex items-center mt-3">
-                        <Users className="h-3 w-3 mr-1" />
-                        {dashboardData.customers.total} total customers
-                      </p>
+              <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-300 cursor-pointer">
+                <CardContent className="p-2.5 sm:p-3 lg:p-4">
+                  <div className="flex flex-col">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-purple-100 text-xs font-medium">Customers</p>
+                      <div className="bg-white/20 p-1.5 sm:p-2 rounded-lg backdrop-blur-sm flex-shrink-0">
+                        <Users className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                      </div>
                     </div>
-                    <div className="bg-white/20 p-4 rounded-2xl backdrop-blur-sm">
-                      <Users className="h-9 w-9 text-white" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card 
-                className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white shadow-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-300 cursor-pointer"
-                onClick={() => router.push('/approvals')}
-              >
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-yellow-100 text-sm font-medium">Pending Approvals</p>
-                      <p className="text-4xl font-bold mt-2 tracking-tight">
-                        {dashboardData.pendingApprovals}
-                      </p>
-                      <p className="text-yellow-200 text-xs flex items-center mt-3">
-                        <ClipboardCheck className="h-3 w-3 mr-1" />
-                        {dashboardData.pendingApprovals === 0 ? 'All caught up!' : 'Click to review'}
-                      </p>
-                    </div>
-                    <div className="bg-white/20 p-4 rounded-2xl backdrop-blur-sm">
-                      <ClipboardCheck className="h-9 w-9 text-white" />
-                    </div>
+                    <p className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight mb-1">
+                      {dashboardData.customers.active}
+                    </p>
+                    <p className="text-purple-200 text-xs flex items-center">
+                      <Users className="h-3 w-3 mr-1 flex-shrink-0" />
+                      <span className="truncate">{dashboardData.customers.total} total</span>
+                    </p>
                   </div>
                 </CardContent>
               </Card>
             </div>
+
+            {/* Quick Actions Section */}
+            <Card className="shadow-lg">
+              <CardHeader>
+                <CardTitle>Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-3">
+                  {ownerModules.slice(0, 6).map((module, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleModuleClick(module.name)}
+                      className={`p-4 rounded-lg border-2 hover:border-blue-500 dark:hover:border-blue-400 transition-all group ${
+                        module.urgency ? 'border-orange-300 bg-orange-50 dark:border-orange-500 dark:bg-orange-900/20' : 'border-gray-200 dark:border-gray-700'
+                      }`}
+                    >
+                      <div className={`p-2 rounded-lg ${module.color} w-fit mb-2 group-hover:scale-110 transition-transform`}>
+                        <module.icon className="h-5 w-5 text-white" />
+                      </div>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">{module.name}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{module.stats}</p>
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -561,70 +564,43 @@ export default function ShopOwnerDashboard() {
               </Card>
             )}
 
-            {/* Worker Performance & Quick Actions */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="shadow-lg">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <UserCheck className="h-5 w-5 text-blue-600" />
-                    Worker Performance
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {dashboardData.workers.performance.length > 0 ? (
-                    <div className="space-y-4">
-                      {dashboardData.workers.performance.map((worker) => (
-                        <div key={worker.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                              <UserCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                            </div>
-                            <div>
-                              <p className="font-semibold text-gray-900 dark:text-white">{worker.name}</p>
-                              <p className="text-sm text-gray-500 dark:text-gray-400">{worker.email}</p>
-                            </div>
+            {/* Worker Performance */}
+            <Card className="shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <UserCheck className="h-5 w-5 text-blue-600" />
+                  Worker Performance
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {dashboardData.workers.performance.length > 0 ? (
+                  <div className="space-y-4">
+                    {dashboardData.workers.performance.map((worker) => (
+                      <div key={worker.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                            <UserCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                           </div>
-                          <div className="text-right">
-                            <p className="font-bold text-gray-900 dark:text-white">PKR {(worker.sales / 1000).toFixed(1)}K</p>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">{worker.transactions} sales</p>
+                          <div>
+                            <p className="font-semibold text-gray-900 dark:text-white">{worker.name}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">{worker.email}</p>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                      <Users className="h-12 w-12 mx-auto mb-2 text-gray-300 dark:text-gray-600" />
-                      <p>No workers assigned</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-lg">
-                <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-3">
-                    {ownerModules.slice(0, 6).map((module, index) => (
-                      <button
-                        key={index}
-                        onClick={() => handleModuleClick(module.name)}
-                        className={`p-4 rounded-lg border-2 hover:border-blue-500 dark:hover:border-blue-400 transition-all group ${
-                          module.urgency ? 'border-orange-300 bg-orange-50 dark:border-orange-500 dark:bg-orange-900/20' : 'border-gray-200 dark:border-gray-700'
-                        }`}
-                      >
-                        <div className={`p-2 rounded-lg ${module.color} w-fit mb-2 group-hover:scale-110 transition-transform`}>
-                          <module.icon className="h-5 w-5 text-white" />
+                        <div className="text-right">
+                          <p className="font-bold text-gray-900 dark:text-white">PKR {(worker.sales / 1000).toFixed(1)}K</p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">{worker.transactions} sales</p>
                         </div>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white">{module.name}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{module.stats}</p>
-                      </button>
+                      </div>
                     ))}
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                ) : (
+                  <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                    <Users className="h-12 w-12 mx-auto mb-2 text-gray-300 dark:text-gray-600" />
+                    <p>No workers assigned</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* All Modules with enhanced styling */}
             <div>

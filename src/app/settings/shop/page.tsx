@@ -164,24 +164,26 @@ function ShopSettingsContent() {
           <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-              <div className="min-w-0">
-                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white truncate">Shop Settings</h1>
-                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">Configure your shop's information and preferences</p>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white leading-tight">Shop Settings</h1>
+                <p className="text-xs sm:text-sm lg:text-base text-gray-600 dark:text-gray-400 mt-1 leading-snug">Configure your shop's information and preferences</p>
               </div>
               <Button 
                 onClick={handleSave}
                 disabled={saving}
-                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-sm sm:text-base w-full sm:w-auto flex-shrink-0"
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-xs sm:text-sm lg:text-base w-full sm:w-auto flex-shrink-0 h-9 sm:h-10 touch-manipulation"
               >
                 {saving ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
+                    <Loader2 className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
+                    <span className="hidden sm:inline">Saving...</span>
+                    <span className="sm:hidden">Saving</span>
                   </>
                 ) : (
                 <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Settings
+                  <Save className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">Save Settings</span>
+                  <span className="sm:hidden">Save</span>
                 </>
               )}
             </Button>
@@ -189,17 +191,17 @@ function ShopSettingsContent() {
 
           {/* Alert Message */}
           {message && (
-            <div className={`flex items-center gap-3 p-4 rounded-lg ${
+            <div className={`flex items-center gap-2.5 sm:gap-3 p-3 sm:p-4 rounded-lg ${
               message.type === 'success' 
                 ? 'bg-green-50 border border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300' 
                 : 'bg-red-50 border border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300'
             }`}>
               {message.type === 'success' ? (
-                <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
               ) : (
-                <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 dark:text-red-400 flex-shrink-0" />
               )}
-              <span className="font-medium">{message.text}</span>
+              <span className="font-medium text-xs sm:text-sm lg:text-base">{message.text}</span>
             </div>
           )}
 
@@ -207,62 +209,62 @@ function ShopSettingsContent() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
             {/* Worker Management Card */}
             <Card 
-              className="hover:shadow-lg dark:hover:shadow-gray-900/50 transition-all cursor-pointer bg-white dark:bg-gray-800 dark:border-gray-700"
+              className="hover:shadow-lg dark:hover:shadow-gray-900/50 transition-all cursor-pointer bg-white dark:bg-gray-800 dark:border-gray-700 active:scale-[0.98] touch-manipulation"
               onClick={() => window.location.href = '/settings/workers'}
             >
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                    <div className="p-2 sm:p-3 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg flex-shrink-0">
-                      <Users className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-600 dark:text-indigo-400" />
+              <CardContent className="p-3 sm:p-4 lg:p-6">
+                <div className="flex items-center justify-between gap-2.5 sm:gap-3">
+                  <div className="flex items-center gap-2.5 sm:gap-3 lg:gap-4 min-w-0 flex-1">
+                    <div className="p-2 sm:p-2.5 lg:p-3 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg flex-shrink-0">
+                      <Users className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-indigo-600 dark:text-indigo-400" />
                     </div>
-                    <div className="min-w-0">
-                      <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white truncate">Worker Management</h3>
-                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Manage team members & permissions</p>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold text-xs sm:text-sm lg:text-base text-gray-900 dark:text-white truncate">Worker Management</h3>
+                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate leading-snug">Manage team members & permissions</p>
                     </div>
                   </div>
-                  <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 dark:text-gray-600 flex-shrink-0" />
+                  <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-gray-400 dark:text-gray-600 flex-shrink-0" />
                 </div>
               </CardContent>
             </Card>
 
             {/* Service Fees Card */}
             <Card 
-              className="hover:shadow-lg dark:hover:shadow-gray-900/50 transition-all cursor-pointer bg-white dark:bg-gray-800 dark:border-gray-700"
+              className="hover:shadow-lg dark:hover:shadow-gray-900/50 transition-all cursor-pointer bg-white dark:bg-gray-800 dark:border-gray-700 active:scale-[0.98] touch-manipulation"
               onClick={() => window.location.href = '/settings/fees'}
             >
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                    <div className="p-2 sm:p-3 bg-green-100 dark:bg-green-900/30 rounded-lg flex-shrink-0">
-                      <Wallet className="h-5 w-5 sm:h-6 sm:w-6 text-green-600 dark:text-green-400" />
+              <CardContent className="p-3 sm:p-4 lg:p-6">
+                <div className="flex items-center justify-between gap-2.5 sm:gap-3">
+                  <div className="flex items-center gap-2.5 sm:gap-3 lg:gap-4 min-w-0 flex-1">
+                    <div className="p-2 sm:p-2.5 lg:p-3 bg-green-100 dark:bg-green-900/30 rounded-lg flex-shrink-0">
+                      <Wallet className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-green-600 dark:text-green-400" />
                     </div>
-                    <div className="min-w-0">
-                      <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white truncate">Service Fees & Commission</h3>
-                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">Configure online banking fees</p>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold text-xs sm:text-sm lg:text-base text-gray-900 dark:text-white truncate">Service Fees & Commission</h3>
+                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate leading-snug">Configure online banking fees</p>
                     </div>
                   </div>
-                  <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 dark:text-gray-600 flex-shrink-0" />
+                  <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-gray-400 dark:text-gray-600 flex-shrink-0" />
                 </div>
               </CardContent>
             </Card>
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-1 sm:gap-2 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
+          <div className="flex gap-1 sm:gap-2 border-b border-gray-200 dark:border-gray-700 overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
             {tabs.map((tab) => {
               const Icon = tab.icon
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2 sm:py-3 border-b-2 transition-colors whitespace-nowrap text-sm sm:text-base ${
+                  className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 lg:px-6 py-2.5 sm:py-3 border-b-2 transition-colors whitespace-nowrap text-xs sm:text-sm lg:text-base touch-manipulation ${
                     activeTab === tab.id
                       ? 'border-blue-600 text-blue-600 font-semibold'
-                      : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                      : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white active:text-blue-600'
                   }`}
                 >
-                  <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                   <span className="hidden sm:inline">{tab.label}</span>
                   <span className="sm:hidden">{tab.label.split(' ')[0]}</span>
                 </button>
@@ -272,16 +274,16 @@ function ShopSettingsContent() {
 
           {/* Business Information */}
           {activeTab === 'business' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
               <Card>
-                <CardHeader className="p-4 sm:p-6">
-                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                    <Building className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+                <CardHeader className="p-3 sm:p-4 lg:p-6">
+                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base lg:text-lg">
+                    <Building className="h-4 w-4 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-blue-600 flex-shrink-0" />
                     Shop Details
                   </CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">Basic information about your shop</CardDescription>
+                  <CardDescription className="text-xs sm:text-sm mt-1">Basic information about your shop</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6 pt-0">
+                <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-4 lg:p-6 pt-0">
                   <div>
                     <Label htmlFor="name" className="text-xs sm:text-sm">Shop Name *</Label>
                     <Input
@@ -300,7 +302,7 @@ function ShopSettingsContent() {
                       onChange={(e) => updateSetting('location', e.target.value)}
                       placeholder="Enter full address"
                       rows={3}
-                      className="text-sm sm:text-base mt-1.5"
+                      className="text-sm sm:text-base mt-1.5 resize-none"
                     />
                   </div>
                   <div>
@@ -317,14 +319,14 @@ function ShopSettingsContent() {
               </Card>
 
               <Card>
-                <CardHeader className="p-4 sm:p-6">
-                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                    <Globe className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
+                <CardHeader className="p-3 sm:p-4 lg:p-6">
+                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base lg:text-lg">
+                    <Globe className="h-4 w-4 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-green-600 flex-shrink-0" />
                     Contact & Online
                   </CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">Contact details and online presence</CardDescription>
+                  <CardDescription className="text-xs sm:text-sm mt-1">Contact details and online presence</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6 pt-0">
+                <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-4 lg:p-6 pt-0">
                   <div>
                     <Label htmlFor="email" className="text-xs sm:text-sm">Email Address</Label>
                     <Input
@@ -373,16 +375,16 @@ function ShopSettingsContent() {
 
           {/* Receipt Configuration */}
           {activeTab === 'receipt' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
               <Card>
-                <CardHeader className="p-4 sm:p-6">
-                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                    <Receipt className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
+                <CardHeader className="p-3 sm:p-4 lg:p-6">
+                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base lg:text-lg">
+                    <Receipt className="h-4 w-4 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-purple-600 flex-shrink-0" />
                     Receipt Customization
                   </CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">Customize your sales receipts</CardDescription>
+                  <CardDescription className="text-xs sm:text-sm mt-1">Customize your sales receipts</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6 pt-0">
+                <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-4 lg:p-6 pt-0">
                   <div>
                     <Label htmlFor="receiptHeader" className="text-xs sm:text-sm">Receipt Header</Label>
                     <Textarea
@@ -419,14 +421,14 @@ function ShopSettingsContent() {
               </Card>
 
               <Card>
-                <CardHeader className="p-4 sm:p-6">
-                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                    <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
+                <CardHeader className="p-3 sm:p-4 lg:p-6">
+                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base lg:text-lg">
+                    <DollarSign className="h-4 w-4 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-green-600 flex-shrink-0" />
                     Financial Settings
                   </CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">Tax and currency configuration</CardDescription>
+                  <CardDescription className="text-xs sm:text-sm mt-1">Tax and currency configuration</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6 pt-0">
+                <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-4 lg:p-6 pt-0">
                   <div>
                     <Label htmlFor="taxRate" className="text-xs sm:text-sm">Tax Rate (%)</Label>
                     <Input
@@ -471,14 +473,14 @@ function ShopSettingsContent() {
           {/* Payment Methods */}
           {activeTab === 'payments' && (
             <Card>
-              <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                  <CreditCard className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600" />
+              <CardHeader className="p-3 sm:p-4 lg:p-6">
+                <CardTitle className="flex items-center gap-2 text-sm sm:text-base lg:text-lg">
+                  <CreditCard className="h-4 w-4 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-indigo-600 flex-shrink-0" />
                   Enabled Payment Methods
                 </CardTitle>
-                <CardDescription className="text-xs sm:text-sm">Select which payment methods your shop accepts</CardDescription>
+                <CardDescription className="text-xs sm:text-sm mt-1">Select which payment methods your shop accepts</CardDescription>
               </CardHeader>
-              <CardContent className="p-4 sm:p-6 pt-0">
+              <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                   {[
                     { key: 'enableCash', label: 'Cash', icon: DollarSign, color: 'green' },
@@ -491,7 +493,7 @@ function ShopSettingsContent() {
                     return (
                       <div
                         key={method.key}
-                        className={`p-3 sm:p-4 border-2 rounded-lg transition-all cursor-pointer ${
+                        className={`p-3 sm:p-4 border-2 rounded-lg transition-all cursor-pointer active:scale-[0.98] touch-manipulation ${
                           settings[method.key as keyof ShopSettings]
                             ? `border-${method.color}-500 bg-${method.color}-50 dark:bg-${method.color}-900/20`
                             : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600'
@@ -506,7 +508,7 @@ function ShopSettingsContent() {
                             className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 rounded flex-shrink-0"
                           />
                           <Icon className={`h-4 w-4 sm:h-5 sm:w-5 text-${method.color}-600 dark:text-${method.color}-400 flex-shrink-0`} />
-                          <span className="font-medium text-sm sm:text-base text-gray-900 dark:text-white">{method.label}</span>
+                          <span className="font-medium text-xs sm:text-sm lg:text-base text-gray-900 dark:text-white truncate">{method.label}</span>
                         </div>
                       </div>
                     )
@@ -519,50 +521,50 @@ function ShopSettingsContent() {
           {/* System Preferences */}
           {activeTab === 'system' && (
             <Card>
-              <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                  <SettingsIcon className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600 dark:text-gray-400" />
+              <CardHeader className="p-3 sm:p-4 lg:p-6">
+                <CardTitle className="flex items-center gap-2 text-sm sm:text-base lg:text-lg">
+                  <SettingsIcon className="h-4 w-4 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-gray-600 dark:text-gray-400 flex-shrink-0" />
                   System Preferences
                 </CardTitle>
-                <CardDescription className="text-xs sm:text-sm">Configure system behavior and notifications</CardDescription>
+                <CardDescription className="text-xs sm:text-sm mt-1">Configure system behavior and notifications</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6 pt-0">
+              <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-4 lg:p-6 pt-0">
                 <div className="flex items-center justify-between p-3 sm:p-4 bg-gray-50 dark:bg-gray-800 rounded-lg gap-3">
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-sm sm:text-base text-gray-900 dark:text-white">Automatic Backup</h4>
-                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Enable daily automatic database backups</p>
+                    <h4 className="font-medium text-xs sm:text-sm lg:text-base text-gray-900 dark:text-white">Automatic Backup</h4>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 leading-snug">Enable daily automatic database backups</p>
                   </div>
                   <input
                     type="checkbox"
                     checked={settings.autoBackup}
                     onChange={(e) => updateSetting('autoBackup', e.target.checked)}
-                    className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 rounded flex-shrink-0"
+                    className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 rounded flex-shrink-0 touch-manipulation"
                   />
                 </div>
 
                 <div className="flex items-center justify-between p-3 sm:p-4 bg-gray-50 dark:bg-gray-800 rounded-lg gap-3">
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-sm sm:text-base text-gray-900 dark:text-white">Email Notifications</h4>
-                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Receive alerts and reports via email</p>
+                    <h4 className="font-medium text-xs sm:text-sm lg:text-base text-gray-900 dark:text-white">Email Notifications</h4>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 leading-snug">Receive alerts and reports via email</p>
                   </div>
                   <input
                     type="checkbox"
                     checked={settings.emailNotifications}
                     onChange={(e) => updateSetting('emailNotifications', e.target.checked)}
-                    className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 rounded flex-shrink-0"
+                    className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 rounded flex-shrink-0 touch-manipulation"
                   />
                 </div>
 
                 <div className="flex items-center justify-between p-3 sm:p-4 bg-gray-50 dark:bg-gray-800 rounded-lg gap-3">
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-sm sm:text-base text-gray-900 dark:text-white">SMS Notifications</h4>
-                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Receive important alerts via SMS</p>
+                    <h4 className="font-medium text-xs sm:text-sm lg:text-base text-gray-900 dark:text-white">SMS Notifications</h4>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 leading-snug">Receive important alerts via SMS</p>
                   </div>
                   <input
                     type="checkbox"
                     checked={settings.smsNotifications}
                     onChange={(e) => updateSetting('smsNotifications', e.target.checked)}
-                    className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 rounded flex-shrink-0"
+                    className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 rounded flex-shrink-0 touch-manipulation"
                   />
                 </div>
               </CardContent>

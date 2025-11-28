@@ -57,22 +57,22 @@ const DEFAULT_FEES: ShopFees = {
   easypaisaSending: {
     serviceName: 'EasyPaisa - Sending',
     fee: 0,
-    isPercentage: true
+    isPercentage: false
   },
   easypaisaReceiving: {
     serviceName: 'EasyPaisa - Receiving',
     fee: 0,
-    isPercentage: true
+    isPercentage: false
   },
   jazzcashSending: {
     serviceName: 'JazzCash - Sending',
     fee: 0,
-    isPercentage: true
+    isPercentage: false
   },
   jazzcashReceiving: {
     serviceName: 'JazzCash - Receiving',
     fee: 0,
-    isPercentage: true
+    isPercentage: false
   },
   bankTransfer: {
     serviceName: 'Bank Transfer',
@@ -86,6 +86,96 @@ const DEFAULT_FEES: ShopFees = {
   }
 }
 
+const SERVICE_DESCRIPTIONS: Record<keyof ShopFees, string> = {
+  mobileLoad: 'Fee charged per mobile recharge/load transaction',
+  easypaisaSending: 'Fee when customers send money via EasyPaisa',
+  easypaisaReceiving: 'Fee when customers receive money via EasyPaisa',
+  jazzcashSending: 'Fee when customers send money via JazzCash',
+  jazzcashReceiving: 'Fee when customers receive money via JazzCash',
+  bankTransfer: 'Fee charged for bank transfer transactions',
+  billPayment: 'Fee charged per utility bill payment'
+}
+
+// ServiceFeeCard component - defined outside to prevent recreation
+const ServiceFeeCard = React.memo(({ 
+  service, 
+  serviceKey,
+  icon: Icon,
+  color,
+  inputValue,
+  onInputChange,
+  onInputBlur,
+  onFeeTypeChange
+}: { 
+  service: ServiceFee
+  serviceKey: keyof ShopFees
+  icon: any
+  color: string
+  inputValue: string
+  onInputChange: (value: string) => void
+  onInputBlur: () => void
+  onFeeTypeChange: (isPercentage: boolean) => void
+}) => {
+  return (
+    <Card className="bg-white dark:bg-gray-800 dark:border-gray-700">
+      <CardHeader className="p-3 sm:p-4 lg:p-6">
+        <CardTitle className="flex items-center gap-2 dark:text-white text-sm sm:text-base lg:text-lg">
+          <Icon className={`h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 ${color} flex-shrink-0`} />
+          <span className="truncate">{service.serviceName}</span>
+        </CardTitle>
+        <CardDescription className="dark:text-gray-400 text-xs sm:text-sm mt-1 leading-relaxed">
+          Configure commission for {service.serviceName}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-4 lg:p-6 pt-0">
+        {/* Fee Type Toggle */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+          <Label className="text-xs sm:text-sm font-medium dark:text-gray-300 whitespace-nowrap flex-shrink-0">Fee Type:</Label>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Button
+              variant={service.isPercentage ? "default" : "outline"}
+              size="sm"
+              onClick={() => onFeeTypeChange(true)}
+              className="dark:border-gray-600 flex-1 sm:flex-initial text-xs sm:text-sm h-9 sm:h-8 min-w-[100px]"
+            >
+              Percentage (%)
+            </Button>
+            <Button
+              variant={!service.isPercentage ? "default" : "outline"}
+              size="sm"
+              onClick={() => onFeeTypeChange(false)}
+              className="dark:border-gray-600 flex-1 sm:flex-initial text-xs sm:text-sm h-9 sm:h-8 min-w-[100px]"
+            >
+              Fixed (PKR)
+            </Button>
+          </div>
+        </div>
+
+        {/* Fee Input */}
+        <div>
+          <Label htmlFor={`${serviceKey}-fee`} className="dark:text-gray-300 text-xs sm:text-sm">
+            Service Fee {service.isPercentage ? '(%)' : '(PKR)'}
+          </Label>
+          <Input
+            id={`${serviceKey}-fee`}
+            type="number"
+            step={service.isPercentage ? "0.1" : "1"}
+            min="0"
+            value={inputValue}
+            placeholder={service.isPercentage ? "Enter percentage (e.g., 1.5)" : "Enter fixed amount (e.g., 50)"}
+            onChange={(e) => onInputChange(e.target.value)}
+            onBlur={onInputBlur}
+            className="mt-1.5 dark:bg-gray-900 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500 text-sm sm:text-base h-9 sm:h-10"
+          />
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+            {SERVICE_DESCRIPTIONS[serviceKey]}
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  )
+})
+
 export default function FeesSettingsPage() {
   const router = useRouter()
   const { user } = useAuth()
@@ -94,6 +184,8 @@ export default function FeesSettingsPage() {
   const [saving, setSaving] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [fees, setFees] = useState<ShopFees>(DEFAULT_FEES)
+  // Local state for input values to prevent focus loss
+  const [inputValues, setInputValues] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (user) {
@@ -108,20 +200,30 @@ export default function FeesSettingsPage() {
       const result = await response.json()
 
       if (response.ok && result.success) {
-        setFees(result.data.fees || DEFAULT_FEES)
+        const fetchedFees = result.data.fees || DEFAULT_FEES
+        setFees(fetchedFees)
+        // Initialize input values
+        const initialInputValues: Record<string, string> = {}
+        Object.keys(fetchedFees).forEach(key => {
+          const fee = fetchedFees[key as keyof ShopFees]
+          initialInputValues[key] = fee.fee > 0 ? fee.fee.toString() : ''
+        })
+        setInputValues(initialInputValues)
       } else {
         // Use default fees if not set
         setFees(DEFAULT_FEES)
+        setInputValues({})
       }
     } catch (error) {
       console.error('Error fetching fees:', error)
       setFees(DEFAULT_FEES)
+      setInputValues({})
     } finally {
       setLoading(false)
     }
   }
 
-  const handleServiceFeeChange = (
+  const handleServiceFeeChange = React.useCallback((
     service: keyof ShopFees,
     field: keyof ServiceFee,
     value: any
@@ -133,7 +235,62 @@ export default function FeesSettingsPage() {
         [field]: value
       }
     }))
-  }
+  }, [])
+
+  const handleInputChange = React.useCallback((serviceKey: keyof ShopFees, value: string) => {
+    // Update local input value immediately (no re-render of parent)
+    setInputValues(prev => ({
+      ...prev,
+      [serviceKey]: value
+    }))
+    
+    // Update the actual fee value
+    const numValue = value === '' ? 0 : parseFloat(value)
+    if (!isNaN(numValue) && numValue >= 0) {
+      setFees(prev => ({
+        ...prev,
+        [serviceKey]: {
+          ...prev[serviceKey],
+          fee: numValue
+        }
+      }))
+    }
+  }, [])
+
+  const handleInputBlur = React.useCallback((serviceKey: keyof ShopFees) => {
+    setInputValues(prev => {
+      const inputValue = prev[serviceKey] || ''
+      const numValue = parseFloat(inputValue)
+      
+      // Validate and update on blur
+      if (inputValue === '' || isNaN(numValue) || numValue < 0) {
+        setFees(prevFees => ({
+          ...prevFees,
+          [serviceKey]: {
+            ...prevFees[serviceKey],
+            fee: 0
+          }
+        }))
+        return {
+          ...prev,
+          [serviceKey]: ''
+        }
+      } else {
+        // Ensure the input value matches the fee value
+        setFees(prevFees => ({
+          ...prevFees,
+          [serviceKey]: {
+            ...prevFees[serviceKey],
+            fee: numValue
+          }
+        }))
+        return {
+          ...prev,
+          [serviceKey]: numValue.toString()
+        }
+      }
+    })
+  }, [])
 
   const handleSaveFees = async () => {
     try {
@@ -171,88 +328,16 @@ export default function FeesSettingsPage() {
     router.push('/settings/shop')
   }
 
-  const ServiceFeeCard = ({ 
-    service, 
-    serviceKey,
-    icon: Icon,
-    color
-  }: { 
-    service: ServiceFee
-    serviceKey: keyof ShopFees
-    icon: any
-    color: string
-  }) => {
-    return (
-      <Card className="bg-white dark:bg-gray-800 dark:border-gray-700">
-        <CardHeader className="p-4 sm:p-6">
-          <CardTitle className="flex items-center gap-2 dark:text-white text-base sm:text-lg">
-            <Icon className={`h-5 w-5 sm:h-6 sm:w-6 ${color} flex-shrink-0`} />
-            <span className="truncate">{service.serviceName}</span>
-          </CardTitle>
-          <CardDescription className="dark:text-gray-400 text-xs sm:text-sm mt-1">
-            Configure commission for {service.serviceName}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6 pt-0">
-          {/* Fee Type Toggle */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
-            <Label className="text-xs sm:text-sm font-medium dark:text-gray-300 whitespace-nowrap">Fee Type:</Label>
-            <div className="flex gap-2 w-full sm:w-auto">
-              <Button
-                variant={service.isPercentage ? "default" : "outline"}
-                size="sm"
-                onClick={() => handleServiceFeeChange(serviceKey, 'isPercentage', true)}
-                className="dark:border-gray-600 flex-1 sm:flex-initial text-xs sm:text-sm"
-              >
-                Percentage (%)
-              </Button>
-              <Button
-                variant={!service.isPercentage ? "default" : "outline"}
-                size="sm"
-                onClick={() => handleServiceFeeChange(serviceKey, 'isPercentage', false)}
-                className="dark:border-gray-600 flex-1 sm:flex-initial text-xs sm:text-sm"
-              >
-                Fixed (PKR)
-              </Button>
-            </div>
-          </div>
+  const handleFeeTypeChange = React.useCallback((serviceKey: keyof ShopFees, isPercentage: boolean) => {
+    setFees(prev => ({
+      ...prev,
+      [serviceKey]: {
+        ...prev[serviceKey],
+        isPercentage
+      }
+    }))
+  }, [])
 
-          {/* Fee Input */}
-          <div>
-            <Label htmlFor={`${serviceKey}-fee`} className="dark:text-gray-300 text-xs sm:text-sm">
-              Service Fee {service.isPercentage ? '(%)' : '(PKR)'}
-            </Label>
-            <Input
-              id={`${serviceKey}-fee`}
-              type="number"
-              step={service.isPercentage ? "0.1" : "1"}
-              min="0"
-              value={service.fee === 0 ? '' : service.fee}
-              placeholder={service.isPercentage ? "Enter percentage (e.g., 1.5)" : "Enter fixed amount (e.g., 50)"}
-              onChange={(e) => handleServiceFeeChange(serviceKey, 'fee', parseFloat(e.target.value) || 0)}
-              className="mt-1.5 dark:bg-gray-900 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500 text-sm sm:text-base h-9 sm:h-10"
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
-              {getServiceDescription(serviceKey)}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  const getServiceDescription = (serviceKey: keyof ShopFees): string => {
-    const descriptions: Record<keyof ShopFees, string> = {
-      mobileLoad: 'Fee charged per mobile recharge/load transaction',
-      easypaisaSending: 'Fee when customers send money via EasyPaisa',
-      easypaisaReceiving: 'Fee when customers receive money via EasyPaisa',
-      jazzcashSending: 'Fee when customers send money via JazzCash',
-      jazzcashReceiving: 'Fee when customers receive money via JazzCash',
-      bankTransfer: 'Fee charged for bank transfer transactions',
-      billPayment: 'Fee charged per utility bill payment'
-    }
-    return descriptions[serviceKey]
-  }
 
   return (
     <ProtectedRoute allowedRoles={[UserRole.SHOP_OWNER, UserRole.SUPER_ADMIN]}>
@@ -265,15 +350,15 @@ export default function FeesSettingsPage() {
           <div className="flex-1 bg-gray-50 dark:bg-gray-900">
             {/* Header */}
             <div className="bg-gradient-to-r from-green-600 to-emerald-700 dark:from-green-800 dark:to-emerald-900 text-white">
-              <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
-                    <button onClick={handleBack} className="p-2 sm:p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-all duration-200 flex-shrink-0">
+              <div className="px-4 sm:px-6 lg:px-8 py-5 sm:py-6 lg:py-8 xl:py-12">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
+                  <div className="flex items-center gap-2.5 sm:gap-3 lg:gap-4 min-w-0 flex-1">
+                    <button onClick={handleBack} className="p-2 sm:p-2.5 lg:p-3 bg-white/10 hover:bg-white/20 active:bg-white/30 rounded-xl transition-all duration-200 flex-shrink-0 touch-manipulation">
                       <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                     </button>
-                    <div className="min-w-0">
-                      <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-1 sm:mb-2 truncate">💰 Service Fees & Commission</h1>
-                      <p className="text-green-100 text-sm sm:text-base lg:text-lg truncate">
+                    <div className="min-w-0 flex-1">
+                      <h1 className="text-xl sm:text-2xl lg:text-3xl xl:text-4xl font-bold mb-1 sm:mb-2 leading-tight">💰 Service Fees & Commission</h1>
+                      <p className="text-green-100 text-xs sm:text-sm lg:text-base leading-snug">
                         Configure fees for online banking and mobile money services
                       </p>
                     </div>
@@ -286,27 +371,27 @@ export default function FeesSettingsPage() {
             {/* Content */}
             <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
               {loading ? (
-                <div className="text-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-                  <p className="mt-4 text-gray-600 dark:text-gray-400">Loading fees configuration...</p>
+                <div className="text-center py-8 sm:py-12">
+                  <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-green-600 mx-auto"></div>
+                  <p className="mt-3 sm:mt-4 text-sm sm:text-base text-gray-600 dark:text-gray-400">Loading fees configuration...</p>
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                   {/* Info Banner */}
                   <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
                     <CardContent className="p-3 sm:p-4">
-                      <p className="text-xs sm:text-sm text-blue-800 dark:text-blue-300">
-                        ℹ️ <strong>Note:</strong> These fees will be applied to all online banking services in your shop. 
-                        You can set fees as a percentage of the transaction or as a fixed PKR amount. 
-                        These settings replace hardcoded values and give you full control over your pricing.
+                      <p className="text-xs sm:text-sm text-blue-800 dark:text-blue-300 leading-relaxed">
+                        <span className="font-semibold">ℹ️ Note:</span> These fees will be applied to all online banking services. 
+                        Set fees as a <strong>percentage</strong> or <strong>fixed PKR amount</strong>. 
+                        These settings give you full control over pricing.
                       </p>
                     </CardContent>
                   </Card>
 
                   {/* Service Fee Cards - All 7 Services */}
-                  <div className="space-y-4">
-                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Mobile Services</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+                  <div className="space-y-3 sm:space-y-4">
+                    <h3 className="text-sm sm:text-base lg:text-lg font-semibold text-gray-900 dark:text-white">Mobile Services</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
                       <ServiceFeeCard 
                         service={fees.mobileLoad} 
                         serviceKey="mobileLoad" 
@@ -316,9 +401,9 @@ export default function FeesSettingsPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">EasyPaisa Services</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                  <div className="space-y-3 sm:space-y-4">
+                    <h3 className="text-sm sm:text-base lg:text-lg font-semibold text-gray-900 dark:text-white">EasyPaisa Services</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
                       <ServiceFeeCard 
                         service={fees.easypaisaSending} 
                         serviceKey="easypaisaSending" 
@@ -334,9 +419,9 @@ export default function FeesSettingsPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">JazzCash Services</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                  <div className="space-y-3 sm:space-y-4">
+                    <h3 className="text-sm sm:text-base lg:text-lg font-semibold text-gray-900 dark:text-white">JazzCash Services</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
                       <ServiceFeeCard 
                         service={fees.jazzcashSending} 
                         serviceKey="jazzcashSending" 
@@ -352,9 +437,9 @@ export default function FeesSettingsPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Banking Services</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                  <div className="space-y-3 sm:space-y-4">
+                    <h3 className="text-sm sm:text-base lg:text-lg font-semibold text-gray-900 dark:text-white">Banking Services</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
                       <ServiceFeeCard 
                         service={fees.bankTransfer} 
                         serviceKey="bankTransfer" 

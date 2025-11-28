@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MessageSquare, Send, Users, Clock, CheckCheck, AlertCircle, Loader2, Check, Menu, X } from 'lucide-react';
+import { MessageSquare, Send, Users, Clock, CheckCheck, AlertCircle, Loader2, Check } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { BusinessSidebar } from '@/components/layout/BusinessSidebar';
@@ -341,41 +341,20 @@ export default function MessagesPage() {
 
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Mobile Sidebar Overlay */}
-      {isMobileSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setIsMobileSidebarOpen(false)}
-        />
-      )}
-      
       {/* Sidebar */}
-      <div className={`
-        fixed lg:static inset-y-0 left-0 z-50 lg:z-auto
-        transform transition-transform duration-300 ease-in-out
-        ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-      `}>
-        <BusinessSidebar />
-      </div>
+      <BusinessSidebar isOpen={isMobileSidebarOpen} onClose={() => setIsMobileSidebarOpen(false)} />
       
-      <div className="flex-1 flex flex-col lg:ml-64 transition-all duration-300">
-        <TopNavigation />
+      {/* Main Content */}
+      <div className={`flex-1 min-h-screen bg-gray-50 dark:bg-gray-900 ${isMobileSidebarOpen ? 'lg:ml-20' : 'lg:ml-64'} transition-all duration-300`}>
+        {/* Top Navigation */}
+        <TopNavigation onMenuClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)} />
         
         <main className="flex-1 p-3 sm:p-4 md:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
-            {/* Header with Hamburger */}
+            {/* Header */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 md:p-6">
               <div className="flex justify-between items-start md:items-center gap-3">
                 <div className="flex items-start md:items-center gap-3 flex-1">
-                  {/* Hamburger Menu - Mobile Only */}
-                  <button
-                    onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-                    className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                    aria-label="Toggle menu"
-                  >
-                    <Menu className="h-6 w-6 text-gray-700 dark:text-gray-300" />
-                  </button>
-                  
                   <div>
                     <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2 md:gap-3">
                       <div className="bg-gradient-to-br from-purple-500 to-blue-600 dark:from-purple-600 dark:to-blue-700 p-2 md:p-3 rounded-lg md:rounded-xl shadow-lg">
