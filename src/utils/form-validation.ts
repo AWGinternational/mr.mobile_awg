@@ -5,7 +5,7 @@ export interface FieldValidation {
   pattern?: RegExp
   minLength?: number
   maxLength?: number
-  customValidator?: (value: any) => string | null
+  customValidator?: (value: unknown) => string | null
   formatter?: (value: string) => string
 }
 
@@ -21,7 +21,7 @@ export interface FormErrors {
 
 export class FormValidator {
   // Validate a single field
-  static validateField(field: string, value: any, rules: FieldValidation): string | null {
+  static validateField(field: string, value: unknown, rules: FieldValidation): string | null {
     // Check required
     if (rules.required && (!value || value.toString().trim() === '')) {
       return `${field} is required`
@@ -61,7 +61,7 @@ export class FormValidator {
   }
 
   // Validate entire form
-  static validateForm(data: any, config: Record<string, FieldValidation>): FormErrors {
+  static validateForm(data: Record<string, unknown>, config: Record<string, FieldValidation>): FormErrors {
     const errors: FormErrors = {}
 
     Object.entries(config).forEach(([fieldName, rules]) => {
@@ -89,7 +89,6 @@ export class FormValidator {
       return this.formatPhoneNumber('92' + withoutLeadingZero)
     } else if (digits.startsWith('92')) {
       // Already has country code, format it properly
-      const countryCode = '92'
       const restDigits = digits.slice(2)
       
       if (restDigits.length === 0) {
@@ -231,7 +230,7 @@ export class FormValidator {
 }
 
 // Hook for real-time form validation
-export function useFormValidation<T extends Record<string, any>>(
+export function useFormValidation<T extends Record<string, unknown>>(
   initialData: T,
   validationRules: Record<keyof T, FieldValidation>
 ) {
@@ -240,7 +239,7 @@ export function useFormValidation<T extends Record<string, any>>(
   const [touched, setTouched] = React.useState<Record<keyof T, boolean>>({} as Record<keyof T, boolean>)
 
   // Validate single field
-  const validateField = React.useCallback((fieldName: keyof T, value: any) => {
+  const validateField = React.useCallback((fieldName: keyof T, value: unknown) => {
     const rules = validationRules[fieldName]
     if (!rules) return null
 
@@ -248,7 +247,7 @@ export function useFormValidation<T extends Record<string, any>>(
   }, [validationRules])
 
   // Update field value with validation
-  const updateField = React.useCallback((fieldName: keyof T, value: any) => {
+  const updateField = React.useCallback((fieldName: keyof T, value: unknown) => {
     // Apply formatter if available
     const rules = validationRules[fieldName]
     const formattedValue = rules?.formatter ? rules.formatter(value) : value

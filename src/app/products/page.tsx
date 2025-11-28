@@ -51,9 +51,31 @@ interface Product {
   stock: number
   lowStockThreshold: number
   status: string
-  category?: { name: string }
-  brand?: { name: string }
+  category?: { id: string; name: string; code: string }
+  brand?: { id: string; name: string; code: string }
   createdAt: string
+}
+
+interface Category {
+  id: string
+  name: string
+  code: string
+  description?: string
+  isActive: boolean
+  _count?: {
+    products: number
+  }
+}
+
+interface Brand {
+  id: string
+  name: string
+  code: string
+  description?: string
+  isActive: boolean
+  _count?: {
+    products: number
+  }
 }
 
 function ProductManagementPage() {
@@ -67,8 +89,8 @@ function ProductManagementPage() {
 
   // State
   const [products, setProducts] = useState<Product[]>([])
-  const [categories, setCategories] = useState<any[]>([])
-  const [brands, setBrands] = useState<any[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [brands, setBrands] = useState<Brand[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -400,7 +422,7 @@ function ProductManagementPage() {
     }
   }
 
-  const handleEditBrand = (brand: any) => {
+  const handleEditBrand = (brand: Brand) => {
     // Workers need approval for updates
     if (isWorker) {
       setApprovalRequest({
@@ -511,7 +533,7 @@ function ProductManagementPage() {
     }
   }
 
-  const handleEditCategory = (category: any) => {
+  const handleEditCategory = (category: Category) => {
     // Workers need approval for updates
     if (isWorker) {
       setApprovalRequest({
