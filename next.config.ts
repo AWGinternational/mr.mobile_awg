@@ -11,6 +11,16 @@ const nextConfig: NextConfig = {
     // Allow client-side rendering for dynamic pages
   },
   
+  // Don't fail build on ESLint warnings (only errors)
+  eslint: {
+    ignoreDuringBuilds: false, // Keep ESLint enabled but allow warnings
+  },
+  
+  // Don't fail build on TypeScript errors (only warnings)
+  typescript: {
+    ignoreBuildErrors: false, // Keep TypeScript checking enabled
+  },
+  
   // Image optimization configuration
   images: {
     remotePatterns: [

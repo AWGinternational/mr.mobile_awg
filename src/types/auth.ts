@@ -16,7 +16,7 @@ export interface AuthUser extends Partial<PrismaUser> {
     id: string
     name: string
     code: string
-    permissions?: Record<string, any>
+    permissions?: Record<string, unknown>
   }>
 }
 

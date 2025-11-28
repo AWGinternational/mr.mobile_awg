@@ -28,7 +28,10 @@ const eslintConfig = [
         "argsIgnorePattern": "^_",
         "varsIgnorePattern": "^_"
       }],
-      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-explicit-any": ["warn", { 
+        "fixToUnknown": false,
+        "ignoreRestArgs": true 
+      }],
       "@typescript-eslint/no-empty-object-type": "warn",
       "react/no-unescaped-entities": "warn",
       "react-hooks/exhaustive-deps": "warn",

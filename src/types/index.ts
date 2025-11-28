@@ -110,7 +110,7 @@ export interface User {
     id: string
     name: string
     code: string
-    permissions?: Record<string, any>
+    permissions?: Record<string, unknown>
   }>
 }
 
@@ -135,7 +135,7 @@ export interface Shop {
   licenseNumber?: string
   gstNumber?: string
   status: ShopStatus
-  settings: Record<string, any>
+  settings: Record<string, unknown>
   ownerId: string
   createdAt: Date
   updatedAt: Date
@@ -150,7 +150,7 @@ export interface Product {
   type: ProductType
   status: ProductStatus
   description?: string
-  specifications: Record<string, any>
+  specifications: Record<string, unknown>
   images: string[]
   warranty?: number
   costPrice: number
@@ -166,7 +166,7 @@ export interface Product {
 }
 
 // API Response Types
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean
   data?: T
   message?: string

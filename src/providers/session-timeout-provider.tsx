@@ -33,7 +33,7 @@ export function SessionTimeoutProvider({ children }: SessionTimeoutProviderProps
     })
   }, [])
 
-  const { extendSession, getTimeRemaining } = useSessionTimeout({
+  const { extendSession } = useSessionTimeout({
     onWarning: handleWarning,
     onTimeout: handleTimeout,
     enabled: status === 'authenticated' && !!session

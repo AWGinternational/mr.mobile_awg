@@ -250,7 +250,7 @@ export function useFormValidation<T extends Record<string, unknown>>(
   const updateField = React.useCallback((fieldName: keyof T, value: unknown) => {
     // Apply formatter if available
     const rules = validationRules[fieldName]
-    const formattedValue = rules?.formatter ? rules.formatter(value) : value
+    const formattedValue = rules?.formatter && typeof value === 'string' ? rules.formatter(value) : value
 
     // Update data
     setData(prev => ({ ...prev, [fieldName]: formattedValue }))

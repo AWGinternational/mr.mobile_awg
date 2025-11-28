@@ -88,7 +88,7 @@ export interface Shop {
   name: string
   code: string
   address: string
-  settings?: any
+  settings?: Record<string, unknown>
 }
 
 export interface Category {
@@ -252,7 +252,7 @@ export interface EnhancedProduct {
   type: ProductType
   status: ProductStatus
   description?: string
-  specifications: Record<string, any>
+  specifications: Record<string, unknown>
   images: string[]
   warranty?: number
   
@@ -383,7 +383,7 @@ export interface OfflineTransaction {
   id: string
   shopId: string
   localTransactionId: string
-  transactionData: Record<string, any>
+  transactionData: Record<string, unknown>
   status: 'PENDING' | 'SYNCED' | 'FAILED'
   syncAttempts: number
   lastSyncAttempt?: Date
@@ -398,7 +398,7 @@ export interface ProductCatalogFilter {
   shopId: string
   name: string
   filterType: 'PRICE_RANGE' | 'BRAND' | 'CATEGORY' | 'CUSTOM'
-  filterData: Record<string, any>
+  filterData: Record<string, unknown>
   isActive: boolean
   sortOrder: number
   createdAt: Date
@@ -546,7 +546,7 @@ export interface ProductVariant {
   productId: string
   name: string
   sku: string
-  specifications: Record<string, any>
+  specifications: Record<string, unknown>
   costPrice: number
   sellingPrice: number
   isActive: boolean

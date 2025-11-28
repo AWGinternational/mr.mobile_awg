@@ -176,6 +176,8 @@ const ServiceFeeCard = React.memo(({
   )
 })
 
+ServiceFeeCard.displayName = 'ServiceFeeCard'
+
 export default function FeesSettingsPage() {
   const router = useRouter()
   const { user } = useAuth()
@@ -397,6 +399,10 @@ export default function FeesSettingsPage() {
                         serviceKey="mobileLoad" 
                         icon={Phone}
                         color="text-purple-600 dark:text-purple-400"
+                        inputValue={inputValues.mobileLoad || String(fees.mobileLoad.fee || '')}
+                        onInputChange={(value) => handleInputChange('mobileLoad', value)}
+                        onInputBlur={() => handleInputBlur('mobileLoad')}
+                        onFeeTypeChange={(isPercentage) => handleFeeTypeChange('mobileLoad', isPercentage)}
                       />
                     </div>
                   </div>
@@ -409,12 +415,20 @@ export default function FeesSettingsPage() {
                         serviceKey="easypaisaSending" 
                         icon={Wallet}
                         color="text-green-600 dark:text-green-400"
+                        inputValue={inputValues.easypaisaSending || String(fees.easypaisaSending.fee || '')}
+                        onInputChange={(value) => handleInputChange('easypaisaSending', value)}
+                        onInputBlur={() => handleInputBlur('easypaisaSending')}
+                        onFeeTypeChange={(isPercentage) => handleFeeTypeChange('easypaisaSending', isPercentage)}
                       />
                       <ServiceFeeCard 
                         service={fees.easypaisaReceiving} 
                         serviceKey="easypaisaReceiving" 
                         icon={Wallet}
                         color="text-green-600 dark:text-green-400"
+                        inputValue={inputValues.easypaisaReceiving || String(fees.easypaisaReceiving.fee || '')}
+                        onInputChange={(value) => handleInputChange('easypaisaReceiving', value)}
+                        onInputBlur={() => handleInputBlur('easypaisaReceiving')}
+                        onFeeTypeChange={(isPercentage) => handleFeeTypeChange('easypaisaReceiving', isPercentage)}
                       />
                     </div>
                   </div>
@@ -427,12 +441,20 @@ export default function FeesSettingsPage() {
                         serviceKey="jazzcashSending" 
                         icon={CreditCard}
                         color="text-orange-600 dark:text-orange-400"
+                        inputValue={inputValues.jazzcashSending || String(fees.jazzcashSending.fee || '')}
+                        onInputChange={(value) => handleInputChange('jazzcashSending', value)}
+                        onInputBlur={() => handleInputBlur('jazzcashSending')}
+                        onFeeTypeChange={(isPercentage) => handleFeeTypeChange('jazzcashSending', isPercentage)}
                       />
                       <ServiceFeeCard 
                         service={fees.jazzcashReceiving} 
                         serviceKey="jazzcashReceiving" 
                         icon={CreditCard}
                         color="text-orange-600 dark:text-orange-400"
+                        inputValue={inputValues.jazzcashReceiving || String(fees.jazzcashReceiving.fee || '')}
+                        onInputChange={(value) => handleInputChange('jazzcashReceiving', value)}
+                        onInputBlur={() => handleInputBlur('jazzcashReceiving')}
+                        onFeeTypeChange={(isPercentage) => handleFeeTypeChange('jazzcashReceiving', isPercentage)}
                       />
                     </div>
                   </div>
@@ -445,12 +467,20 @@ export default function FeesSettingsPage() {
                         serviceKey="bankTransfer" 
                         icon={Banknote}
                         color="text-blue-600 dark:text-blue-400"
+                        inputValue={inputValues.bankTransfer || String(fees.bankTransfer.fee || '')}
+                        onInputChange={(value) => handleInputChange('bankTransfer', value)}
+                        onInputBlur={() => handleInputBlur('bankTransfer')}
+                        onFeeTypeChange={(isPercentage) => handleFeeTypeChange('bankTransfer', isPercentage)}
                       />
                       <ServiceFeeCard 
                         service={fees.billPayment} 
                         serviceKey="billPayment" 
                         icon={Receipt}
                         color="text-indigo-600 dark:text-indigo-400"
+                        inputValue={inputValues.billPayment || String(fees.billPayment.fee || '')}
+                        onInputChange={(value) => handleInputChange('billPayment', value)}
+                        onInputBlur={() => handleInputBlur('billPayment')}
+                        onFeeTypeChange={(isPercentage) => handleFeeTypeChange('billPayment', isPercentage)}
                       />
                     </div>
                   </div>
