@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/use-auth'
 import { useNotify } from '@/hooks/use-notifications'
 import { ProtectedRoute } from '@/components/auth/protected-route'
@@ -54,10 +55,10 @@ function InventoryManagementPage() {
   const isOwner = currentUser?.role === UserRole.SHOP_OWNER || currentUser?.role === UserRole.SUPER_ADMIN
   const isWorker = currentUser?.role === UserRole.SHOP_WORKER
 
-  const [inventory, setInventory] = useState<InventoryItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [page, setPage] = useState(1)
   const [showAdjustDialog, setShowAdjustDialog] = useState(false)
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null)
   const [adjustmentType, setAdjustmentType] = useState<'add' | 'remove'>('add')
@@ -102,31 +103,52 @@ function InventoryManagementPage() {
     fetchUserShop()
   }, [currentUser])
 
-  const fetchInventory = async () => {
-    if (!currentShopId) {
-      return
-    }
-    
-    try {
-      setLoading(true)
-      const response = await fetch(`/api/inventory?shopId=${currentShopId}`)
-      if (!response.ok) throw new Error('Failed to fetch inventory')
-      
-      const data = await response.json()
-      setInventory(data.inventory || [])
-    } catch (error) {
-      console.error('Error fetching inventory:', error)
-      showError('Failed to load inventory')
-    } finally {
-      setLoading(false)
-    }
-  }
-
+  // Debounced search term
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
+  
   useEffect(() => {
-    if (currentShopId) {
-      fetchInventory()
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+      setPage(1) // Reset to first page on search
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  // Fetch inventory with React Query
+  const { data: inventoryData, isLoading: loading, error, refetch } = useQuery({
+    queryKey: ['inventory', currentShopId, debouncedSearchTerm, statusFilter, page],
+    queryFn: async () => {
+      if (!currentShopId) return { inventory: [], pagination: { page: 1, limit: 20, totalCount: 0, totalPages: 0 } }
+      
+      const params = new URLSearchParams({
+        shopId: currentShopId,
+        page: page.toString(),
+        limit: '20',
+        ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
+        ...(statusFilter !== 'ALL' && { status: statusFilter })
+      })
+      
+      const response = await fetch(`/api/inventory?${params}`)
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to fetch inventory')
+      }
+      return response.json()
+    },
+    enabled: !!currentShopId,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes
+  })
+
+  // Show error notification
+  useEffect(() => {
+    if (error) {
+      showError(error instanceof Error ? error.message : 'Failed to load inventory')
     }
-  }, [currentShopId])
+  }, [error, showError])
+
+  const inventory = inventoryData?.inventory || []
+  const pagination = inventoryData?.pagination || { page: 1, limit: 20, totalCount: 0, totalPages: 0 }
 
   const handleBack = () => {
     if (currentUser?.role === UserRole.SUPER_ADMIN) {
@@ -138,71 +160,70 @@ function InventoryManagementPage() {
     }
   }
 
-  const handleStockAdjustment = async () => {
-    if (!selectedItem || !adjustmentQty) return
-
-    try {
-      if (adjustmentType === 'add') {
-        // Add stock
-        const response = await fetch('/api/inventory', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            shopId: currentShopId,
-            productId: selectedItem.productId,
-            quantity: parseInt(adjustmentQty),
-            costPrice: selectedItem.costPrice,
-            reason: adjustmentReason
-          })
-        })
-
-        if (!response.ok) throw new Error('Failed to add stock')
-        success(`Added ${adjustmentQty} units to stock`)
-      } else {
-        // Remove stock
-        const response = await fetch('/api/inventory', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            shopId: currentShopId,
-            productId: selectedItem.productId,
-            quantity: parseInt(adjustmentQty),
-            reason: adjustmentReason
-          })
-        })
-
-        if (!response.ok) throw new Error('Failed to remove stock')
-        success(`Removed ${adjustmentQty} units from stock`)
-      }
-
-      // Refresh inventory
-      await fetchInventory()
-      
+  // Mutation for stock adjustment
+  const stockAdjustmentMutation = useMutation({
+    mutationFn: async ({ type, data }: { type: 'add' | 'remove', data: { shopId: string | null, productId: string, quantity: number, costPrice?: number, reason?: string } }) => {
+      const method = type === 'add' ? 'POST' : 'PATCH'
+      const response = await fetch('/api/inventory', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      })
+      if (!response.ok) throw new Error(`Failed to ${type} stock`)
+      return response.json()
+    },
+    onSuccess: (_, variables) => {
+      const action = variables.type === 'add' ? 'Added' : 'Removed'
+      success(`${action} ${variables.data.quantity || adjustmentQty} units to stock`)
+      // Invalidate and refetch inventory
+      queryClient.invalidateQueries({ queryKey: ['inventory', currentShopId] })
       // Close dialog
       setShowAdjustDialog(false)
       setSelectedItem(null)
       setAdjustmentQty('')
       setAdjustmentReason('')
-    } catch (error) {
-      console.error('Error adjusting stock:', error)
+    },
+    onError: () => {
       showError('Failed to adjust stock')
+    }
+  })
+
+  const handleStockAdjustment = () => {
+    if (!selectedItem || !adjustmentQty || !adjustmentReason) return
+
+    if (adjustmentType === 'add') {
+      stockAdjustmentMutation.mutate({
+        type: 'add',
+        data: {
+          shopId: currentShopId,
+          productId: selectedItem.productId,
+          quantity: parseInt(adjustmentQty),
+          costPrice: selectedItem.costPrice,
+          reason: adjustmentReason
+        }
+      })
+    } else {
+      stockAdjustmentMutation.mutate({
+        type: 'remove',
+        data: {
+          shopId: currentShopId,
+          productId: selectedItem.productId,
+          quantity: parseInt(adjustmentQty),
+          reason: adjustmentReason
+        }
+      })
     }
   }
 
-  const filteredInventory = inventory.filter(item => {
-    const matchesSearch = !searchTerm || 
-      item.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.sku.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || item.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+  // Server-side filtering is handled by API, no client-side filtering needed
+  const filteredInventory = inventory
 
   const stats = {
     total: inventory.length,
-    inStock: inventory.filter(i => i.status === 'IN_STOCK').length,
-    lowStock: inventory.filter(i => i.status === 'LOW_STOCK').length,
-    outOfStock: inventory.filter(i => i.status === 'OUT_OF_STOCK').length,
-    totalValue: inventory.reduce((sum, i) => sum + (i.currentStock * i.sellingPrice), 0)
+    inStock: inventory.filter((i: InventoryItem) => i.status === 'IN_STOCK').length,
+    lowStock: inventory.filter((i: InventoryItem) => i.status === 'LOW_STOCK').length,
+    outOfStock: inventory.filter((i: InventoryItem) => i.status === 'OUT_OF_STOCK').length,
+    totalValue: inventory.reduce((sum: number, i: InventoryItem) => sum + (i.currentStock * i.sellingPrice), 0)
   }
 
   const getStatusBadge = (status: string) => {
@@ -239,9 +260,10 @@ function InventoryManagementPage() {
                     </div>
                   </div>
                   <Button
-                    onClick={fetchInventory}
+                    onClick={() => refetch()}
                     variant="ghost"
                     className="bg-white/10 hover:bg-white/20 text-white w-full sm:w-auto"
+                    disabled={loading}
                   >
                     <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                     Refresh
@@ -304,12 +326,15 @@ function InventoryManagementPage() {
                         className="pl-10"
                       />
                     </div>
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <Select value={statusFilter} onValueChange={(value) => {
+                      setStatusFilter(value)
+                      setPage(1) // Reset to first page on filter change
+                    }}>
                       <SelectTrigger>
                         <SelectValue placeholder="Filter by status" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="ALL">All Status</SelectItem>
                         <SelectItem value="IN_STOCK">In Stock</SelectItem>
                         <SelectItem value="LOW_STOCK">Low Stock</SelectItem>
                         <SelectItem value="OUT_OF_STOCK">Out of Stock</SelectItem>
@@ -321,8 +346,8 @@ function InventoryManagementPage() {
 
               {/* Inventory List */}
               <Card>
-                <CardContent className="p-6">
-                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">Stock Levels</h3>
+                <CardContent className="p-3 sm:p-6">
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-4 sm:mb-6">Stock Levels</h3>
                   
                   {loading ? (
                     <div className="flex justify-center py-12">
@@ -335,34 +360,37 @@ function InventoryManagementPage() {
                       <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">Add products with stock to see them here</p>
                     </div>
                   ) : (
+                    <>
                     <div className="space-y-3">
-                      {filteredInventory.map((item) => {
+                      {filteredInventory.map((item: InventoryItem) => {
                         const badge = getStatusBadge(item.status)
                         return (
-                          <div key={item.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow">
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <h4 className="font-semibold text-gray-900 dark:text-white">{item.productName}</h4>
-                                  <Badge className={badge.color}>
+                          <div key={item.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                  <h4 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base truncate">{item.productName}</h4>
+                                  <Badge className={`${badge.color} text-xs`}>
                                     <span className="flex items-center gap-1">
                                       {badge.icon}
-                                      {item.status.replace('_', ' ')}
+                                      <span className="hidden xs:inline">{item.status.replace('_', ' ')}</span>
                                     </span>
                                   </Badge>
                                 </div>
-                                <p className="text-sm text-gray-600 dark:text-gray-300">SKU: {item.sku} • Model: {item.model}</p>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">{item.category} • {item.brand}</p>
+                                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 truncate">SKU: {item.sku} • Model: {item.model}</p>
+                                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">{item.category} • {item.brand}</p>
                                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                                   Selling Price: PKR {item.sellingPrice.toLocaleString()}
                                 </p>
                               </div>
-                              <div className="text-right">
-                                <p className="text-sm text-gray-600 dark:text-gray-300">Current Stock</p>
-                                <p className="text-2xl font-bold text-gray-900 dark:text-white">{item.currentStock}</p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Threshold: {item.lowStockThreshold}</p>
+                              <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 sm:gap-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100 dark:border-gray-800">
+                                <div className="sm:text-right">
+                                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300">Current Stock</p>
+                                  <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{item.currentStock}</p>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">Threshold: {item.lowStockThreshold}</p>
+                                </div>
                                 {isOwner && (
-                                  <div className="flex gap-2 mt-3">
+                                  <div className="flex gap-2 sm:mt-3">
                                     <Button
                                       size="sm"
                                       variant="outline"
@@ -371,10 +399,10 @@ function InventoryManagementPage() {
                                         setAdjustmentType('add')
                                         setShowAdjustDialog(true)
                                       }}
-                                      className="gap-1"
+                                      className="gap-1 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
                                     >
-                                      <Plus className="h-4 w-4" />
-                                      Add
+                                      <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+                                      <span className="hidden xs:inline">Add</span>
                                     </Button>
                                     <Button
                                       size="sm"
@@ -384,17 +412,17 @@ function InventoryManagementPage() {
                                         setAdjustmentType('remove')
                                         setShowAdjustDialog(true)
                                       }}
-                                      className="gap-1"
+                                      className="gap-1 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
                                       disabled={item.currentStock === 0}
                                     >
-                                      <Minus className="h-4 w-4" />
-                                      Remove
+                                      <Minus className="h-3 w-3 sm:h-4 sm:w-4" />
+                                      <span className="hidden xs:inline">Remove</span>
                                     </Button>
                                   </div>
                                 )}
                                 {isWorker && (
-                                  <div className="text-xs text-gray-400 italic mt-3">
-                                    Contact owner to adjust inventory
+                                  <div className="text-xs text-gray-400 italic sm:mt-3">
+                                    Contact owner
                                   </div>
                                 )}
                               </div>
@@ -403,6 +431,63 @@ function InventoryManagementPage() {
                         )
                       })}
                     </div>
+                      
+                      {/* Pagination Controls */}
+                      {pagination.totalPages > 1 && (
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700">
+                          <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 text-center sm:text-left">
+                            Showing {((page - 1) * pagination.limit) + 1}-{Math.min(page * pagination.limit, pagination.totalCount)} of {pagination.totalCount}
+                          </div>
+                          <div className="flex gap-1 sm:gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setPage(p => Math.max(1, p - 1))}
+                              disabled={page === 1 || loading}
+                              className="text-xs sm:text-sm h-8 px-2 sm:px-3"
+                            >
+                              <span className="hidden sm:inline">Previous</span>
+                              <span className="sm:hidden">Prev</span>
+                            </Button>
+                            <div className="flex items-center gap-1">
+                              {Array.from({ length: Math.min(3, pagination.totalPages) }, (_, i) => {
+                                let pageNum: number
+                                if (pagination.totalPages <= 3) {
+                                  pageNum = i + 1
+                                } else if (page <= 2) {
+                                  pageNum = i + 1
+                                } else if (page >= pagination.totalPages - 1) {
+                                  pageNum = pagination.totalPages - 2 + i
+                                } else {
+                                  pageNum = page - 1 + i
+                                }
+                                return (
+                                  <Button
+                                    key={pageNum}
+                                    variant={page === pageNum ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => setPage(pageNum)}
+                                    disabled={loading}
+                                    className="text-xs sm:text-sm h-8 w-8 sm:w-9 p-0"
+                                  >
+                                    {pageNum}
+                                  </Button>
+                                )
+                              })}
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
+                              disabled={page === pagination.totalPages || loading}
+                              className="text-xs sm:text-sm h-8 px-2 sm:px-3"
+                            >
+                              Next
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </CardContent>
               </Card>
@@ -410,40 +495,42 @@ function InventoryManagementPage() {
 
             {/* Stock Adjustment Dialog */}
             {showAdjustDialog && selectedItem && (
-              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
-                  <div className="p-6 border-b border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-900">
+              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+                <div className="bg-white dark:bg-gray-800 rounded-t-xl sm:rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+                  <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
                       {adjustmentType === 'add' ? 'Add Stock' : 'Remove Stock'}
                     </h3>
-                    <p className="text-sm text-gray-600">{selectedItem.productName}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 truncate">{selectedItem.productName}</p>
                   </div>
-                  <div className="p-6 space-y-4">
+                  <div className="p-4 sm:p-6 space-y-4">
                     <div>
-                      <Label>Current Stock</Label>
-                      <p className="text-2xl font-bold text-gray-900">{selectedItem.currentStock} units</p>
+                      <Label className="text-gray-700 dark:text-gray-300">Current Stock</Label>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{selectedItem.currentStock} units</p>
                     </div>
                     <div className="space-y-2">
-                      <Label>Quantity to {adjustmentType === 'add' ? 'Add' : 'Remove'} *</Label>
+                      <Label className="text-gray-700 dark:text-gray-300">Quantity to {adjustmentType === 'add' ? 'Add' : 'Remove'} *</Label>
                       <Input
                         type="number"
                         value={adjustmentQty}
                         onChange={(e) => setAdjustmentQty(e.target.value)}
                         placeholder="Enter quantity"
                         min="1"
+                        className="h-10 sm:h-11"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Reason *</Label>
+                      <Label className="text-gray-700 dark:text-gray-300">Reason *</Label>
                       <Input
                         value={adjustmentReason}
                         onChange={(e) => setAdjustmentReason(e.target.value)}
-                        placeholder="e.g., New stock arrival, Damaged items, etc."
+                        placeholder="e.g., New stock arrival, Damaged items"
+                        className="h-10 sm:h-11"
                       />
                     </div>
                     {adjustmentQty && (
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                        <p className="text-sm text-blue-900">
+                      <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-3">
+                        <p className="text-sm text-blue-900 dark:text-blue-100">
                           New stock will be: <strong>
                             {adjustmentType === 'add' 
                               ? selectedItem.currentStock + parseInt(adjustmentQty)
@@ -454,7 +541,7 @@ function InventoryManagementPage() {
                       </div>
                     )}
                   </div>
-                  <div className="p-6 border-t border-gray-200 bg-gray-50 flex gap-3">
+                  <div className="p-4 sm:p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex gap-3 rounded-b-xl">
                     <Button 
                       variant="outline" 
                       onClick={() => {
@@ -463,16 +550,16 @@ function InventoryManagementPage() {
                         setAdjustmentQty('')
                         setAdjustmentReason('')
                       }} 
-                      className="flex-1"
+                      className="flex-1 h-10 sm:h-11"
                     >
                       Cancel
                     </Button>
                     <Button 
                       onClick={handleStockAdjustment} 
-                      className="flex-1 bg-blue-600 hover:bg-blue-700" 
-                      disabled={!adjustmentQty || !adjustmentReason}
+                      className="flex-1 h-10 sm:h-11 bg-blue-600 hover:bg-blue-700" 
+                      disabled={!adjustmentQty || !adjustmentReason || stockAdjustmentMutation.isPending}
                     >
-                      Confirm
+                      {stockAdjustmentMutation.isPending ? 'Processing...' : 'Confirm'}
                     </Button>
                   </div>
                 </div>

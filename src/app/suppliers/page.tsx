@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/use-auth'
 import { useNotify } from '@/hooks/use-notifications'
 import { useFormNavigation } from '@/hooks/use-form-navigation'
@@ -58,17 +59,17 @@ interface Supplier {
 
 export default function SupplierManagementPage() {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const { user: currentUser, logout } = useAuth()
   const { success, error: showError } = useNotify()
   const { handleNavigationKeys } = useFormNavigation()
   const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [page, setPage] = useState(1)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [suppliers, setSuppliers] = useState<Supplier[]>([])
-  const [loading, setLoading] = useState(true)
-  const [actionLoading, setActionLoading] = useState(false)
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null)
   const [formData, setFormData] = useState({
     name: '',
@@ -84,63 +85,77 @@ export default function SupplierManagementPage() {
     status: 'ACTIVE'
   })
 
+  // Debounced search term
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
+  
   useEffect(() => {
-    fetchSuppliers()
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+      setPage(1) // Reset to first page on search
+    }, 300)
+    return () => clearTimeout(timer)
   }, [searchTerm])
 
-  const fetchSuppliers = async () => {
-    try {
-      setLoading(true)
-      const params = new URLSearchParams()
-      if (searchTerm) params.append('search', searchTerm)
-      params.append('_t', Date.now().toString()) // Cache-busting
-      
-      const response = await fetch(`/api/suppliers?${params}`, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache'
-        }
+  // Fetch suppliers with React Query
+  const { data: suppliersData, isLoading: loading, error } = useQuery({
+    queryKey: ['suppliers', debouncedSearchTerm, statusFilter, page],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '20',
+        ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
+        ...(statusFilter !== 'ALL' && { status: statusFilter })
       })
-      const data = await response.json()
       
-      if (data.success) {
-        setSuppliers(data.data.suppliers)
-      } else {
-        showError(data.error || 'Failed to fetch suppliers')
+      const response = await fetch(`/api/suppliers?${params}`)
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to fetch suppliers')
       }
-    } catch (error) {
-      console.error('Fetch suppliers error:', error)
-      showError('Failed to fetch suppliers')
-    } finally {
-      setLoading(false)
-    }
-  }
+      return response.json()
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes
+  })
 
-  const handleCreate = async () => {
-    try {
-      setActionLoading(true)
+  const suppliers = suppliersData?.data?.suppliers || []
+  const pagination = suppliersData?.data?.pagination || { page: 1, limit: 20, totalCount: 0, totalPages: 0 }
+
+  // Show error notification
+  useEffect(() => {
+    if (error) {
+      showError(error instanceof Error ? error.message : 'Failed to load suppliers')
+    }
+  }, [error, showError])
+
+  // Mutation for create supplier
+  const createMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
       const response = await fetch('/api/suppliers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(data)
       })
       
-      const data = await response.json()
-      
-      if (data.success) {
-        success('Supplier created successfully')
-        setShowCreateDialog(false)
-        resetForm()
-        fetchSuppliers()
-      } else {
-        showError(data.error || 'Failed to create supplier')
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to create supplier')
       }
-    } catch (error) {
-      console.error('Create supplier error:', error)
-      showError('Failed to create supplier')
-    } finally {
-      setActionLoading(false)
+      return response.json()
+    },
+    onSuccess: () => {
+      success('Supplier created successfully')
+      setShowCreateDialog(false)
+      resetForm()
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] })
+    },
+    onError: (error: Error) => {
+      showError(error.message)
     }
+  })
+
+  const handleCreate = () => {
+    createMutation.mutate(formData)
   }
 
   const handleEdit = (supplier: Supplier) => {
@@ -161,34 +176,36 @@ export default function SupplierManagementPage() {
     setShowEditDialog(true)
   }
 
-  const handleUpdate = async () => {
-    if (!selectedSupplier) return
-    
-    try {
-      setActionLoading(true)
-      const response = await fetch(`/api/suppliers/${selectedSupplier.id}`, {
+  // Mutation for update supplier
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string, data: typeof formData }) => {
+      const response = await fetch(`/api/suppliers/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(data)
       })
       
-      const data = await response.json()
-      
-      if (data.success) {
-        success('Supplier updated successfully')
-        setShowEditDialog(false)
-        setSelectedSupplier(null)
-        resetForm()
-        fetchSuppliers()
-      } else {
-        showError(data.error || 'Failed to update supplier')
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to update supplier')
       }
-    } catch (error) {
-      console.error('Update supplier error:', error)
-      showError('Failed to update supplier')
-    } finally {
-      setActionLoading(false)
+      return response.json()
+    },
+    onSuccess: () => {
+      success('Supplier updated successfully')
+      setShowEditDialog(false)
+      setSelectedSupplier(null)
+      resetForm()
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] })
+    },
+    onError: (error: Error) => {
+      showError(error.message)
     }
+  })
+
+  const handleUpdate = () => {
+    if (!selectedSupplier) return
+    updateMutation.mutate({ id: selectedSupplier.id, data: formData })
   }
 
   const handleDelete = (supplier: Supplier) => {
@@ -196,31 +213,33 @@ export default function SupplierManagementPage() {
     setShowDeleteDialog(true)
   }
 
-  const handleDeleteConfirm = async () => {
-    if (!selectedSupplier) return
-    
-    try {
-      setActionLoading(true)
-      const response = await fetch(`/api/suppliers/${selectedSupplier.id}`, {
+  // Mutation for delete supplier
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/suppliers/${id}`, {
         method: 'DELETE'
       })
       
-      const data = await response.json()
-      
-      if (data.success) {
-        success('Supplier deleted successfully')
-        setShowDeleteDialog(false)
-        setSelectedSupplier(null)
-        fetchSuppliers()
-      } else {
-        showError(data.error || 'Failed to delete supplier')
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to delete supplier')
       }
-    } catch (error) {
-      console.error('Delete supplier error:', error)
-      showError('Failed to delete supplier')
-    } finally {
-      setActionLoading(false)
+      return response.json()
+    },
+    onSuccess: () => {
+      success('Supplier deleted successfully')
+      setShowDeleteDialog(false)
+      setSelectedSupplier(null)
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] })
+    },
+    onError: (error: Error) => {
+      showError(error.message)
     }
+  })
+
+  const handleDeleteConfirm = () => {
+    if (!selectedSupplier) return
+    deleteMutation.mutate(selectedSupplier.id)
   }
 
   const resetForm = () => {
@@ -260,9 +279,9 @@ export default function SupplierManagementPage() {
 
   const stats = {
     total: suppliers.length,
-    active: suppliers.filter(s => s.status === 'ACTIVE').length,
-    totalPaid: suppliers.reduce((sum, s) => sum + (s.totalPaid || 0), 0),
-    totalOrders: suppliers.reduce((sum, s) => sum + (s.totalOrders || 0), 0)
+    active: suppliers.filter((s: Supplier) => s.status === 'ACTIVE').length,
+    totalPaid: suppliers.reduce((sum: number, s: Supplier) => sum + (s.totalPaid || 0), 0),
+    totalOrders: suppliers.reduce((sum: number, s: Supplier) => sum + (s.totalOrders || 0), 0)
   }
 
   return (
@@ -370,8 +389,9 @@ export default function SupplierManagementPage() {
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-3 sm:space-y-4">
-                  {suppliers.map((supplier) => (
+                <>
+                  <div className="space-y-3 sm:space-y-4">
+                    {suppliers.map((supplier: Supplier) => (
                     <div key={supplier.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4 hover:border-orange-300 dark:hover:border-orange-500 hover:shadow-md transition-all">
                       <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
                         {/* Icon & Main Info */}
@@ -440,8 +460,61 @@ export default function SupplierManagementPage() {
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+
+                  {/* Pagination Controls */}
+                  {pagination.totalPages > 1 && (
+                    <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Showing {((page - 1) * pagination.limit) + 1} to {Math.min(page * pagination.limit, pagination.totalCount)} of {pagination.totalCount} suppliers
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPage(p => Math.max(1, p - 1))}
+                          disabled={page === 1 || loading}
+                        >
+                          Previous
+                        </Button>
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                            let pageNum: number
+                            if (pagination.totalPages <= 5) {
+                              pageNum = i + 1
+                            } else if (page <= 3) {
+                              pageNum = i + 1
+                            } else if (page >= pagination.totalPages - 2) {
+                              pageNum = pagination.totalPages - 4 + i
+                            } else {
+                              pageNum = page - 2 + i
+                            }
+                            return (
+                              <Button
+                                key={pageNum}
+                                variant={page === pageNum ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setPage(pageNum)}
+                                disabled={loading}
+                              >
+                                {pageNum}
+                              </Button>
+                            )
+                          })}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
+                          disabled={page === pagination.totalPages || loading}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
@@ -579,8 +652,8 @@ export default function SupplierManagementPage() {
             <Button variant="outline" onClick={() => { setShowCreateDialog(false); resetForm(); }}>
               Cancel
             </Button>
-            <Button onClick={handleCreate} disabled={actionLoading}>
-              {actionLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+            <Button onClick={handleCreate} disabled={createMutation.isPending}>
+              {createMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
               Create Supplier
             </Button>
           </DialogFooter>
@@ -685,8 +758,8 @@ export default function SupplierManagementPage() {
             <Button variant="outline" onClick={() => { setShowEditDialog(false); setSelectedSupplier(null); resetForm(); }}>
               Cancel
             </Button>
-            <Button onClick={handleUpdate} disabled={actionLoading}>
-              {actionLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+            <Button onClick={handleUpdate} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
               Update Supplier
             </Button>
           </DialogFooter>
@@ -707,8 +780,8 @@ export default function SupplierManagementPage() {
             <Button variant="outline" onClick={() => { setShowDeleteDialog(false); setSelectedSupplier(null); }}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteConfirm} disabled={actionLoading}>
-              {actionLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+            <Button variant="destructive" onClick={handleDeleteConfirm} disabled={deleteMutation.isPending}>
+              {deleteMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
               Delete
             </Button>
           </DialogFooter>

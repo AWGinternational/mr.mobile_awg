@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/use-auth'
 import { useNotify } from '@/hooks/use-notifications'
 import { ProtectedRoute } from '@/components/auth/protected-route'
@@ -16,6 +17,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { BusinessSidebar } from '@/components/layout/BusinessSidebar'
 import { TopNavigation } from '@/components/layout/TopNavigation'
 import {
@@ -82,19 +84,18 @@ function ProductManagementPage() {
   const router = useRouter()
   const { user: currentUser, logout } = useAuth()
   const { success, error: showError } = useNotify()
+  const queryClient = useQueryClient()
 
   // Check if user is owner (can perform all actions)
   const isOwner = currentUser?.role === UserRole.SHOP_OWNER || currentUser?.role === UserRole.SUPER_ADMIN
   const isWorker = currentUser?.role === UserRole.SHOP_WORKER
 
   // State
-  const [products, setProducts] = useState<Product[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
-  const [brands, setBrands] = useState<Brand[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [page, setPage] = useState(1)
+  const [limit] = useState(50) // 50 products per page
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
@@ -117,6 +118,15 @@ function ProductManagementPage() {
   // Approval system state
   const [showApprovalDialog, setShowApprovalDialog] = useState(false)
   const [approvalRequest, setApprovalRequest] = useState<any>(null)
+
+  // Delete confirmation dialogs
+  const [showDeleteProductDialog, setShowDeleteProductDialog] = useState(false)
+  const [showDeleteBrandDialog, setShowDeleteBrandDialog] = useState(false)
+  const [showDeleteCategoryDialog, setShowDeleteCategoryDialog] = useState(false)
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null)
+  const [brandToDelete, setBrandToDelete] = useState<Brand | null>(null)
+  const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -141,69 +151,138 @@ function ProductManagementPage() {
   const [importLoading, setImportLoading] = useState(false)
   const [importResults, setImportResults] = useState<any>(null)
 
-  // Fetch products
-  const fetchProducts = async () => {
-    try {
-      setLoading(true)
-      const response = await fetch('/api/products')
-      const data = await response.json()
-      
-      if (response.ok) {
-        setProducts(data.products || [])
+  // Build query params for products
+  const productsQueryParams = useMemo(() => {
+    const params = new URLSearchParams()
+    params.append('page', page.toString())
+    params.append('limit', limit.toString())
+    if (statusFilter !== 'all') params.append('status', statusFilter)
+    if (categoryFilter !== 'all') params.append('category', categoryFilter)
+    if (searchTerm) params.append('search', searchTerm)
+    return params.toString()
+  }, [page, limit, statusFilter, categoryFilter, searchTerm])
+
+  // Fetch products with React Query
+  const {
+    data: productsData,
+    isLoading: productsLoading,
+    error: productsError
+  } = useQuery({
+    queryKey: ['products', page, limit, statusFilter, categoryFilter, searchTerm],
+    queryFn: async () => {
+      const response = await fetch(`/api/products?${productsQueryParams}`)
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to fetch products')
       }
-    } catch (error) {
-      console.error('Failed to fetch products:', error)
-      showError('Failed to fetch products')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Fetch categories
-  const fetchCategories = async () => {
-    try {
-      const response = await fetch('/api/categories')
-      const data = await response.json()
-      if (response.ok) {
-        setCategories(data.data || [])
-      }
-    } catch (error) {
-      console.error('Failed to fetch categories:', error)
-    }
-  }
-
-  // Fetch brands
-  const fetchBrands = async () => {
-    try {
-      const response = await fetch('/api/brands')
-      const data = await response.json()
-      if (response.ok) {
-        setBrands(data.data || [])
-      }
-    } catch (error) {
-      console.error('Failed to fetch brands:', error)
-    }
-  }
-
-  useEffect(() => {
-    fetchProducts()
-    fetchCategories()
-    fetchBrands()
-  }, [])
-
-  // Filter products
-  const filteredProducts = products.filter(product => {
-    const searchLower = searchTerm.toLowerCase()
-    const matchesSearch = !searchTerm || 
-      product.name?.toLowerCase().includes(searchLower) ||
-      product.model?.toLowerCase().includes(searchLower) ||
-      product.sku?.toLowerCase().includes(searchLower)
-
-    const matchesStatus = statusFilter === 'all' || product.status === statusFilter
-    const matchesCategory = categoryFilter === 'all' || product.category?.name === categoryFilter
-
-    return matchesSearch && matchesStatus && matchesCategory
+      return response.json()
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
   })
+
+  // Fetch categories with React Query
+  const { data: categoriesData } = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const response = await fetch('/api/categories')
+      if (!response.ok) throw new Error('Failed to fetch categories')
+      const data = await response.json()
+      return data.data || []
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes - categories change less frequently
+  })
+
+  // Fetch brands with React Query
+  const { data: brandsData } = useQuery({
+    queryKey: ['brands'],
+    queryFn: async () => {
+      const response = await fetch('/api/brands')
+      if (!response.ok) throw new Error('Failed to fetch brands')
+      const data = await response.json()
+      return data.data || []
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes - brands change less frequently
+  })
+
+  // Extract data from queries - MEMOIZE to prevent new array references on every render
+  // This is CRITICAL to prevent infinite loops in Select components
+  const products = useMemo(() => productsData?.products || [], [productsData?.products])
+  const categories = useMemo(() => categoriesData || [], [categoriesData])
+  const brands = useMemo(() => brandsData || [], [brandsData])
+  const loading = productsLoading
+  const pagination = productsData?.pagination
+
+  // Memoize the category SelectItem list to prevent re-creation on every render
+  // This is ESSENTIAL - without this, React sees new children and re-renders infinitely
+  const categorySelectItems = useMemo(() => {
+    return categories.map((cat: Category) => (
+      <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+    ))
+  }, [categories])
+
+  // Memoize form SelectItem lists as well
+  const categoryFormSelectItems = useMemo(() => {
+    return categories.map((cat: Category) => (
+      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+    ))
+  }, [categories])
+
+  const brandFormSelectItems = useMemo(() => {
+    return brands.map((brand: Brand) => (
+      <SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>
+    ))
+  }, [brands])
+
+  // Memoize handlers WITHOUT dependencies on filter values
+  // This is CRITICAL - if handlers depend on filter values, they get recreated on every change
+  // which causes Select to see new onValueChange prop, triggering infinite loop
+  const handleStatusFilterChange = useCallback((value: string) => {
+    // Use functional update to avoid depending on statusFilter
+    setStatusFilter((prev) => {
+      // Only update if value actually changed
+      if (prev !== value) {
+        return value
+      }
+      return prev
+    })
+  }, []) // Empty dependency array - handler never changes
+
+  const handleCategoryFilterChange = useCallback((value: string) => {
+    // Use functional update to avoid depending on categoryFilter
+    setCategoryFilter((prev) => {
+      // Only update if value actually changed
+      if (prev !== value) {
+        return value
+      }
+      return prev
+    })
+  }, []) // Empty dependency array - handler never changes
+
+  // Handle errors
+  useEffect(() => {
+    if (productsError) {
+      showError('Failed to fetch products')
+    }
+  }, [productsError, showError])
+
+  // Reset to page 1 when filters change (but prevent infinite loop)
+  // Use ref to track previous values and only update when they actually change
+  const prevFiltersRef = useRef({ statusFilter, categoryFilter, searchTerm })
+  useEffect(() => {
+    const prev = prevFiltersRef.current
+    const hasChanged = 
+      prev.statusFilter !== statusFilter || 
+      prev.categoryFilter !== categoryFilter || 
+      prev.searchTerm !== searchTerm
+    
+    if (hasChanged) {
+      setPage(1)
+      prevFiltersRef.current = { statusFilter, categoryFilter, searchTerm }
+    }
+  }, [statusFilter, categoryFilter, searchTerm])
+
+  // Server-side filtering is now handled by the API, no need for client-side filtering
 
   // Handlers
   const handleLogout = async () => {
@@ -267,7 +346,8 @@ function ProductManagementPage() {
         success('Product created successfully')
         setShowCreateDialog(false)
         resetForm()
-        fetchProducts()
+        // Invalidate products query to refetch
+        queryClient.invalidateQueries({ queryKey: ['products'] })
       } else {
         const data = await response.json()
         console.error('API Error:', data)
@@ -336,7 +416,8 @@ function ProductManagementPage() {
         setShowEditDialog(false)
         setSelectedProduct(null)
         resetForm()
-        fetchProducts()
+        // Invalidate products query to refetch
+        queryClient.invalidateQueries({ queryKey: ['products'] })
       } else {
         const data = await response.json()
         throw new Error(data.error || 'Failed to update product')
@@ -360,22 +441,8 @@ function ProductManagementPage() {
     }
 
     // Owner can delete directly (with confirmation)
-    if (!window.confirm(`Delete ${product.name}?`)) return
-
-    try {
-      const response = await fetch(`/api/products/${product.id}`, {
-        method: 'DELETE'
-      })
-
-      if (response.ok) {
-        success('Product deleted successfully')
-        fetchProducts()
-      } else {
-        throw new Error('Failed to delete product')
-      }
-    } catch (error) {
-      showError('Failed to delete product')
-    }
+    setProductToDelete(product)
+    setShowDeleteProductDialog(true)
   }
 
   const resetForm = () => {
@@ -413,7 +480,7 @@ function ProductManagementPage() {
         setBrandName('')
         setBrandCode('')
         setBrandDescription('')
-        fetchBrands()
+        queryClient.invalidateQueries({ queryKey: ['brands'] })
       } else {
         throw new Error('Failed to create brand')
       }
@@ -464,7 +531,7 @@ function ProductManagementPage() {
         setBrandName('')
         setBrandCode('')
         setBrandDescription('')
-        fetchBrands()
+        queryClient.invalidateQueries({ queryKey: ['brands'] })
       } else {
         throw new Error('Failed to update brand')
       }
@@ -475,7 +542,7 @@ function ProductManagementPage() {
   }
 
   const handleDeleteBrand = async (brandId: string) => {
-    const brand = brands.find(b => b.id === brandId)
+    const brand = brands.find((b: Brand) => b.id === brandId)
     
     // Workers need approval for deletes
     if (isWorker) {
@@ -490,18 +557,9 @@ function ProductManagementPage() {
     }
 
     // Owner can delete directly
-    if (!window.confirm('Delete this brand?')) return
-
-    try {
-      const response = await fetch(`/api/brands/${brandId}`, { method: 'DELETE' })
-      if (response.ok) {
-        success('Brand deleted successfully')
-        fetchBrands()
-      } else {
-        throw new Error('Failed to delete brand')
-      }
-    } catch (error) {
-      showError('Failed to delete brand')
+    if (brand) {
+      setBrandToDelete(brand)
+      setShowDeleteBrandDialog(true)
     }
   }
 
@@ -524,7 +582,7 @@ function ProductManagementPage() {
         setCategoryName('')
         setCategoryCode('')
         setCategoryDescription('')
-        fetchCategories()
+        queryClient.invalidateQueries({ queryKey: ['categories'] })
       } else {
         throw new Error('Failed to create category')
       }
@@ -575,7 +633,7 @@ function ProductManagementPage() {
         setCategoryName('')
         setCategoryCode('')
         setCategoryDescription('')
-        fetchCategories()
+        queryClient.invalidateQueries({ queryKey: ['categories'] })
       } else {
         throw new Error('Failed to update category')
       }
@@ -586,7 +644,7 @@ function ProductManagementPage() {
   }
 
   const handleDeleteCategory = async (categoryId: string) => {
-    const category = categories.find(c => c.id === categoryId)
+    const category = categories.find((c: Category) => c.id === categoryId)
     
     // Workers need approval for deletes
     if (isWorker) {
@@ -601,18 +659,76 @@ function ProductManagementPage() {
     }
 
     // Owner can delete directly
-    if (!window.confirm('Delete this category?')) return
+    if (category) {
+      setCategoryToDelete(category)
+      setShowDeleteCategoryDialog(true)
+    }
+  }
 
+  // Delete confirmation handlers
+  const handleDeleteProductConfirm = async () => {
+    if (!productToDelete) return
+    
+    setDeleteLoading(true)
     try {
-      const response = await fetch(`/api/categories/${categoryId}`, { method: 'DELETE' })
+      const response = await fetch(`/api/products/${productToDelete.id}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        success('Product deleted successfully')
+        queryClient.invalidateQueries({ queryKey: ['products'] })
+        setShowDeleteProductDialog(false)
+        setProductToDelete(null)
+      } else {
+        throw new Error('Failed to delete product')
+      }
+    } catch (error) {
+      showError('Failed to delete product')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  const handleDeleteBrandConfirm = async () => {
+    if (!brandToDelete) return
+    
+    setDeleteLoading(true)
+    try {
+      const response = await fetch(`/api/brands/${brandToDelete.id}`, { method: 'DELETE' })
+      if (response.ok) {
+        success('Brand deleted successfully')
+        queryClient.invalidateQueries({ queryKey: ['brands'] })
+        setShowDeleteBrandDialog(false)
+        setBrandToDelete(null)
+      } else {
+        throw new Error('Failed to delete brand')
+      }
+    } catch (error) {
+      showError('Failed to delete brand')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  const handleDeleteCategoryConfirm = async () => {
+    if (!categoryToDelete) return
+    
+    setDeleteLoading(true)
+    try {
+      const response = await fetch(`/api/categories/${categoryToDelete.id}`, { method: 'DELETE' })
       if (response.ok) {
         success('Category deleted successfully')
-        fetchCategories()
+        queryClient.invalidateQueries({ queryKey: ['categories'] })
+        setShowDeleteCategoryDialog(false)
+        setCategoryToDelete(null)
       } else {
         throw new Error('Failed to delete category')
       }
     } catch (error) {
       showError('Failed to delete category')
+    } finally {
+      setDeleteLoading(false)
     }
   }
 
@@ -720,8 +836,8 @@ function ProductManagementPage() {
       if (response.ok && result.success) {
         setImportResults(result)
         success(result.message || `Successfully imported ${result.createdCount} products`)
-        // Refresh the products list to show new products
-        await fetchProducts()
+        // Invalidate products query to refetch
+        queryClient.invalidateQueries({ queryKey: ['products'] })
         setImportFile(null)
         setShowImportDialog(false)
       } else {
@@ -743,10 +859,10 @@ function ProductManagementPage() {
 
   const stats = {
     total: products.length,
-    active: products.filter(p => p.status === 'ACTIVE').length,
-    inStock: products.filter(p => p.stock > p.lowStockThreshold).length,
-    lowStock: products.filter(p => p.stock > 0 && p.stock <= p.lowStockThreshold).length,
-    outOfStock: products.filter(p => p.stock === 0).length
+    active: products.filter((p: Product) => p.status === 'ACTIVE').length,
+    inStock: products.filter((p: Product) => p.stock > p.lowStockThreshold).length,
+    lowStock: products.filter((p: Product) => p.stock > 0 && p.stock <= p.lowStockThreshold).length,
+    outOfStock: products.filter((p: Product) => p.stock === 0).length
   }
 
   return (
@@ -848,7 +964,7 @@ function ProductManagementPage() {
                     className="pl-10"
                   />
                 </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="Filter by status" />
                   </SelectTrigger>
@@ -859,15 +975,13 @@ function ProductManagementPage() {
                     <SelectItem value="DISCONTINUED">Discontinued</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <Select value={categoryFilter} onValueChange={handleCategoryFilterChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="Filter by category" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Categories</SelectItem>
-                    {categories.map(cat => (
-                      <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
-                    ))}
+                    {categorySelectItems}
                   </SelectContent>
                 </Select>
               </div>
@@ -881,7 +995,7 @@ function ProductManagementPage() {
                 <div className="min-w-0 flex-1">
                   <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white truncate">Product Catalog</h3>
                   <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                    Showing {filteredProducts.length} of {products.length} products
+                    Showing {products.length} of {pagination?.totalCount || 0} products
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2 w-full sm:w-auto">
@@ -930,14 +1044,14 @@ function ProductManagementPage() {
                   <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
                   <p className="text-gray-600 dark:text-gray-400 mt-4">Loading products...</p>
                 </div>
-              ) : filteredProducts.length === 0 ? (
+              ) : products.length === 0 ? (
                 <div className="text-center py-12">
                   <Package className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
                   <p className="text-gray-600 dark:text-gray-400">No products found</p>
                 </div>
               ) : (
                 <div className="grid gap-3 sm:gap-4">
-                  {filteredProducts.map((product) => {
+                  {products.map((product: Product) => {
                     const stockBadge = getStockBadge(product.stock, product.lowStockThreshold)
                     return (
                       <div
@@ -1010,6 +1124,58 @@ function ProductManagementPage() {
                   })}
                 </div>
               )}
+
+              {/* Pagination Controls */}
+              {pagination && pagination.totalPages > 1 && (
+                <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.totalCount)} of {pagination.totalCount} products
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={!pagination.hasPreviousPage}
+                    >
+                      Previous
+                    </Button>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                        let pageNum: number
+                        if (pagination.totalPages <= 5) {
+                          pageNum = i + 1
+                        } else if (pagination.page <= 3) {
+                          pageNum = i + 1
+                        } else if (pagination.page >= pagination.totalPages - 2) {
+                          pageNum = pagination.totalPages - 4 + i
+                        } else {
+                          pageNum = pagination.page - 2 + i
+                        }
+                        return (
+                          <Button
+                            key={pageNum}
+                            variant={pagination.page === pageNum ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setPage(pageNum)}
+                            className="min-w-[40px]"
+                          >
+                            {pageNum}
+                          </Button>
+                        )
+                      })}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
+                      disabled={!pagination.hasNextPage}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
           </TabsContent>
@@ -1030,7 +1196,7 @@ function ProductManagementPage() {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {brands.map((brand) => (
+                  {brands.map((brand: Brand) => (
                     <div key={brand.id} className="border border-gray-200 rounded-lg p-4 hover:border-teal-300 hover:shadow-md transition-all group">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 flex-1">
@@ -1089,7 +1255,7 @@ function ProductManagementPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {categories.map((category) => (
+                  {categories.map((category: Category) => (
                     <div key={category.id} className="border border-gray-200 rounded-lg p-4 hover:border-teal-300 hover:shadow-md transition-all group">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3 flex-1">
@@ -1164,9 +1330,7 @@ function ProductManagementPage() {
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
-                        {categories.map(cat => (
-                          <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                        ))}
+                        {categoryFormSelectItems}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1177,9 +1341,7 @@ function ProductManagementPage() {
                         <SelectValue placeholder="Select brand" />
                       </SelectTrigger>
                       <SelectContent>
-                        {brands.map(brand => (
-                          <SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>
-                        ))}
+                        {brandFormSelectItems}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1617,6 +1779,139 @@ function ProductManagementPage() {
             </div>
           </div>
         )}
+
+        {/* Delete Product Confirmation Dialog */}
+        <Dialog open={showDeleteProductDialog} onOpenChange={setShowDeleteProductDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center">
+                  <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-300" />
+                </div>
+                <div>
+                  <DialogTitle>Delete Product</DialogTitle>
+                  <DialogDescription>This action cannot be undone</DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+            <div className="py-4">
+              <p className="text-gray-700 dark:text-gray-300">
+                Are you sure you want to delete <strong>{productToDelete?.name}</strong>?
+              </p>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowDeleteProductDialog(false)
+                  setProductToDelete(null)
+                }}
+                disabled={deleteLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDeleteProductConfirm}
+                className="bg-red-600 hover:bg-red-700"
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? 'Deleting...' : 'Delete'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Brand Confirmation Dialog */}
+        <Dialog open={showDeleteBrandDialog} onOpenChange={setShowDeleteBrandDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center">
+                  <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-300" />
+                </div>
+                <div>
+                  <DialogTitle>Delete Brand</DialogTitle>
+                  <DialogDescription>This action cannot be undone</DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+            <div className="py-4">
+              <p className="text-gray-700 dark:text-gray-300">
+                Are you sure you want to delete <strong>{brandToDelete?.name}</strong>?
+              </p>
+              {brandToDelete?._count && brandToDelete._count.products > 0 && (
+                <p className="text-red-600 dark:text-red-400 text-sm mt-2">
+                  Warning: This brand has {brandToDelete._count.products} product(s).
+                </p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowDeleteBrandDialog(false)
+                  setBrandToDelete(null)
+                }}
+                disabled={deleteLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDeleteBrandConfirm}
+                className="bg-red-600 hover:bg-red-700"
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? 'Deleting...' : 'Delete'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Category Confirmation Dialog */}
+        <Dialog open={showDeleteCategoryDialog} onOpenChange={setShowDeleteCategoryDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center">
+                  <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-300" />
+                </div>
+                <div>
+                  <DialogTitle>Delete Category</DialogTitle>
+                  <DialogDescription>This action cannot be undone</DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+            <div className="py-4">
+              <p className="text-gray-700 dark:text-gray-300">
+                Are you sure you want to delete <strong>{categoryToDelete?.name}</strong>?
+              </p>
+              {categoryToDelete?._count && categoryToDelete._count.products > 0 && (
+                <p className="text-red-600 dark:text-red-400 text-sm mt-2">
+                  Warning: This category has {categoryToDelete._count.products} product(s).
+                </p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowDeleteCategoryDialog(false)
+                  setCategoryToDelete(null)
+                }}
+                disabled={deleteLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDeleteCategoryConfirm}
+                className="bg-red-600 hover:bg-red-700"
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? 'Deleting...' : 'Delete'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Approval Request Dialog */}
         <ApprovalRequestDialog

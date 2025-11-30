@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/use-auth'
 import { useNotify } from '@/hooks/use-notifications'
 import { ProtectedRoute } from '@/components/auth/protected-route'
@@ -53,12 +54,12 @@ interface Customer {
 
 function CustomerManagementPage() {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const { user: currentUser, logout } = useAuth()
   const { success, error: showError } = useNotify()
 
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [page, setPage] = useState(1)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showViewDialog, setShowViewDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
@@ -82,7 +83,17 @@ function CustomerManagementPage() {
     address: '',
     city: ''
   })
-  const [actionLoading, setActionLoading] = useState(false)
+
+  // Debounced search term
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+      setPage(1) // Reset to first page on search
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
 
   // Fetch user's shop
   useEffect(() => {
@@ -111,74 +122,78 @@ function CustomerManagementPage() {
     fetchUserShop()
   }, [currentUser])
 
-  // Fetch customers
-  const fetchCustomers = useCallback(async () => {
-    if (!currentShopId) return
-    
-    try {
-      setLoading(true)
-      const response = await fetch(`/api/customers?shopId=${currentShopId}`)
-      if (!response.ok) throw new Error('Failed to fetch customers')
+  // Fetch customers with React Query
+  const { data: customersData, isLoading: loading, error } = useQuery({
+    queryKey: ['customers', currentShopId, debouncedSearchTerm, page],
+    queryFn: async () => {
+      if (!currentShopId) return { customers: [], pagination: { page: 1, limit: 20, totalCount: 0, totalPages: 0 } }
       
-      const data = await response.json()
-      setCustomers(data.customers || [])
-    } catch (error) {
-      console.error('Error fetching customers:', error)
-      // showError is used here but not in dependencies to avoid infinite loop
-    } finally {
-      setLoading(false)
-    }
-  }, [currentShopId])
+      const params = new URLSearchParams({
+        shopId: currentShopId,
+        page: page.toString(),
+        limit: '20',
+        ...(debouncedSearchTerm && { search: debouncedSearchTerm })
+      })
+      
+      const response = await fetch(`/api/customers?${params}`)
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to fetch customers')
+      }
+      return response.json()
+    },
+    enabled: !!currentShopId,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes
+  })
 
+  const customers = customersData?.customers || []
+  const pagination = customersData?.pagination || { page: 1, limit: 20, totalCount: 0, totalPages: 0 }
+
+  // Show error notification
   useEffect(() => {
-    if (currentShopId) {
-      fetchCustomers()
+    if (error) {
+      showError(error instanceof Error ? error.message : 'Failed to load customers')
     }
-  }, [currentShopId, fetchCustomers])
+  }, [error, showError])
 
-  // Debug effect to log customers state changes
-  useEffect(() => {
-    // Customer state tracking for debugging
-  }, [customers])
-
-  const handleCreateCustomer = async () => {
-    if (!currentShopId || !formData.name || !formData.phone) {
-      showError('Name and phone number are required')
-      return
-    }
-
-    try {
+  // Mutation for create customer
+  const createMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      if (!currentShopId) throw new Error('Shop ID is required')
       
       const response = await fetch('/api/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           shopId: currentShopId,
-          ...formData
+          ...data
         })
       })
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to create customer')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to create customer')
       }
-
-      const result = await response.json()
-      
-      // Add the new customer to the list immediately (optimistic update)
-      setCustomers(prev => {
-        const updated = [result.customer, ...prev]
-        return updated
-      })
-      
+      return response.json()
+    },
+    onSuccess: () => {
       success('Customer added successfully!')
       setShowCreateDialog(false)
       setFormData({ name: '', phone: '', email: '', cnic: '', address: '', city: '' })
-      
-    } catch (error: any) {
-      console.error('❌ Error creating customer:', error)
-      showError(error.message || 'Failed to create customer')
+      queryClient.invalidateQueries({ queryKey: ['customers', currentShopId] })
+    },
+    onError: (error: Error) => {
+      showError(error.message)
     }
+  })
+
+  const handleCreateCustomer = () => {
+    if (!currentShopId || !formData.name || !formData.phone) {
+      showError('Name and phone number are required')
+      return
+    }
+    createMutation.mutate(formData)
   }
 
   const handleEditCustomer = (customer: Customer) => {
@@ -199,75 +214,65 @@ function CustomerManagementPage() {
     setShowDeleteDialog(true)
   }
 
-  const handleUpdateCustomer = async () => {
-    if (!selectedCustomer || !currentShopId) return
-
-    try {
-      setActionLoading(true)
-      
-      const response = await fetch(`/api/customers/${selectedCustomer.id}`, {
+  // Mutation for update customer
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string, data: typeof editFormData }) => {
+      const response = await fetch(`/api/customers/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editFormData)
+        body: JSON.stringify(data)
       })
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to update customer')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to update customer')
       }
-
-      const result = await response.json()
-      
-      // Update the customer in the list
-      setCustomers(prev => 
-        prev.map(customer => 
-          customer.id === selectedCustomer.id 
-            ? { ...customer, ...result.customer }
-            : customer
-        )
-      )
-      
+      return response.json()
+    },
+    onSuccess: () => {
       success('Customer updated successfully!')
       setShowEditDialog(false)
       setSelectedCustomer(null)
       setEditFormData({ name: '', phone: '', email: '', cnic: '', address: '', city: '' })
-      
-    } catch (error: any) {
-      console.error('❌ Error updating customer:', error)
-      showError(error.message || 'Failed to update customer')
-    } finally {
-      setActionLoading(false)
+      queryClient.invalidateQueries({ queryKey: ['customers', currentShopId] })
+    },
+    onError: (error: Error) => {
+      showError(error.message)
     }
+  })
+
+  const handleUpdateCustomer = () => {
+    if (!selectedCustomer) return
+    updateMutation.mutate({ id: selectedCustomer.id, data: editFormData })
   }
 
-  const handleDeleteCustomerConfirm = async () => {
-    if (!selectedCustomer) return
-
-    try {
-      setActionLoading(true)
-      
-      const response = await fetch(`/api/customers/${selectedCustomer.id}`, {
+  // Mutation for delete customer
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/customers/${id}`, {
         method: 'DELETE'
       })
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to delete customer')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to delete customer')
       }
-
-      // Remove the customer from the list
-      setCustomers(prev => prev.filter(customer => customer.id !== selectedCustomer.id))
-      
+      return response.json()
+    },
+    onSuccess: () => {
       success('Customer deleted successfully!')
       setShowDeleteDialog(false)
       setSelectedCustomer(null)
-      
-    } catch (error: any) {
-      console.error('❌ Error deleting customer:', error)
-      showError(error.message || 'Failed to delete customer')
-    } finally {
-      setActionLoading(false)
+      queryClient.invalidateQueries({ queryKey: ['customers', currentShopId] })
+    },
+    onError: (error: Error) => {
+      showError(error.message)
     }
+  })
+
+  const handleDeleteCustomerConfirm = () => {
+    if (!selectedCustomer) return
+    deleteMutation.mutate(selectedCustomer.id)
   }
 
   const handleLogout = async () => {
@@ -289,19 +294,14 @@ function CustomerManagementPage() {
     }
   }
 
-  const filteredCustomers = customers.filter(customer => {
-    const searchLower = searchTerm.toLowerCase()
-    return !searchTerm || 
-      customer.name.toLowerCase().includes(searchLower) ||
-      customer.phone.includes(searchTerm) ||
-      customer.email?.toLowerCase().includes(searchLower)
-  })
+  // Server-side filtering is handled by API, no client-side filtering needed
+  const filteredCustomers = customers
 
   const stats = {
     total: customers.length,
-    active: customers.filter(c => c.lastPurchase && new Date(c.lastPurchase) > new Date(Date.now() - 30 * 86400000)).length,
-    totalRevenue: customers.reduce((sum, c) => sum + c.totalSpent, 0),
-    avgSpent: customers.length > 0 ? customers.reduce((sum, c) => sum + c.totalSpent, 0) / customers.length : 0
+    active: customers.filter((c: Customer) => c.lastPurchase && new Date(c.lastPurchase) > new Date(Date.now() - 30 * 86400000)).length,
+    totalRevenue: customers.reduce((sum: number, c: Customer) => sum + c.totalSpent, 0),
+    avgSpent: customers.length > 0 ? customers.reduce((sum: number, c: Customer) => sum + c.totalSpent, 0) / customers.length : 0
   }
 
   const formatCurrency = (amount: number) => {
@@ -456,7 +456,7 @@ function CustomerManagementPage() {
                 </div>
               ) : (
               <div className="space-y-2 sm:space-y-3">
-                {filteredCustomers.map((customer) => (
+                {filteredCustomers.map((customer: Customer) => (
                   <div key={customer.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4 hover:shadow-md dark:hover:shadow-gray-900/50 transition-shadow bg-white dark:bg-gray-800">
                     {/* Mobile: Stacked Layout */}
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
@@ -531,6 +531,58 @@ function CustomerManagementPage() {
                   </div>
                 ))}
               </div>
+              )}
+
+              {/* Pagination Controls */}
+              {!loading && pagination.totalPages > 1 && (
+                <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    Showing {((page - 1) * pagination.limit) + 1} to {Math.min(page * pagination.limit, pagination.totalCount)} of {pagination.totalCount} customers
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1 || loading}
+                    >
+                      Previous
+                    </Button>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                        let pageNum: number
+                        if (pagination.totalPages <= 5) {
+                          pageNum = i + 1
+                        } else if (page <= 3) {
+                          pageNum = i + 1
+                        } else if (page >= pagination.totalPages - 2) {
+                          pageNum = pagination.totalPages - 4 + i
+                        } else {
+                          pageNum = page - 2 + i
+                        }
+                        return (
+                          <Button
+                            key={pageNum}
+                            variant={page === pageNum ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setPage(pageNum)}
+                            disabled={loading}
+                          >
+                            {pageNum}
+                          </Button>
+                        )
+                      })}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
+                      disabled={page === pagination.totalPages || loading}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -654,10 +706,10 @@ function CustomerManagementPage() {
                 <Button variant="outline" onClick={() => setShowEditDialog(false)} className="flex-1">Cancel</Button>
                 <Button 
                   onClick={handleUpdateCustomer} 
-                  disabled={!editFormData.name || !editFormData.phone || actionLoading}
+                  disabled={!editFormData.name || !editFormData.phone || updateMutation.isPending}
                   className="flex-1 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {actionLoading ? 'Updating...' : 'Update Customer'}
+                  {updateMutation.isPending ? 'Updating...' : 'Update Customer'}
                 </Button>
               </div>
             </div>
@@ -696,10 +748,10 @@ function CustomerManagementPage() {
                 <Button variant="outline" onClick={() => setShowDeleteDialog(false)} className="flex-1">Cancel</Button>
                 <Button 
                   onClick={handleDeleteCustomerConfirm} 
-                  disabled={actionLoading}
+                  disabled={deleteMutation.isPending}
                   className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {actionLoading ? 'Deleting...' : 'Delete Customer'}
+                  {deleteMutation.isPending ? 'Deleting...' : 'Delete Customer'}
                 </Button>
               </div>
             </div>

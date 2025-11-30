@@ -81,22 +81,58 @@ export async function GET(request: NextRequest) {
     const monthStart = startOfMonth(now)
     const monthEnd = endOfMonth(now)
 
-    // 5. Get today's sales by this worker
-    const todaySales = await prisma.sale.findMany({
-      where: {
-        shopId,
-        sellerId: workerId,
-        saleDate: {
-          gte: todayStart,
-          lte: todayEnd,
+    // 5-8. Parallel fetch: today's sales, weekly sales, monthly sales, shop settings
+    const [todaySales, weeklySales, monthlySales, shopForSettings] = await Promise.all([
+      // Today's sales
+      prisma.sale.findMany({
+        where: {
+          shopId,
+          sellerId: workerId,
+          saleDate: {
+            gte: todayStart,
+            lte: todayEnd,
+          },
         },
-      },
-      select: {
-        id: true,
-        totalAmount: true,
-        status: true,
-      },
-    })
+        select: {
+          id: true,
+          totalAmount: true,
+          status: true,
+        },
+      }),
+      // Weekly sales
+      prisma.sale.findMany({
+        where: {
+          shopId,
+          sellerId: workerId,
+          saleDate: {
+            gte: weekStart,
+            lte: weekEnd,
+          },
+        },
+        select: {
+          totalAmount: true,
+        },
+      }),
+      // Monthly sales
+      prisma.sale.findMany({
+        where: {
+          shopId,
+          sellerId: workerId,
+          saleDate: {
+            gte: monthStart,
+            lte: monthEnd,
+          },
+        },
+        select: {
+          totalAmount: true,
+        },
+      }),
+      // Shop settings for commission rate
+      prisma.shop.findUnique({
+        where: { id: shopId },
+        select: { settings: true },
+      })
+    ])
 
     // Calculate today's metrics
     const todayTotal = todaySales.reduce(
@@ -105,53 +141,17 @@ export async function GET(request: NextRequest) {
     )
     const todayTransactions = todaySales.length
 
-    // 6. Get weekly sales
-    const weeklySales = await prisma.sale.findMany({
-      where: {
-        shopId,
-        sellerId: workerId,
-        saleDate: {
-          gte: weekStart,
-          lte: weekEnd,
-        },
-      },
-      select: {
-        totalAmount: true,
-      },
-    })
-
     const weeklyTotal = weeklySales.reduce(
       (sum, sale) => sum + Number(sale.totalAmount),
       0
     )
-
-    // 7. Get monthly sales
-    const monthlySales = await prisma.sale.findMany({
-      where: {
-        shopId,
-        sellerId: workerId,
-        saleDate: {
-          gte: monthStart,
-          lte: monthEnd,
-        },
-      },
-      select: {
-        totalAmount: true,
-      },
-    })
 
     const monthlyTotal = monthlySales.reduce(
       (sum, sale) => sum + Number(sale.totalAmount),
       0
     )
 
-    // 8. Get shop settings for commission rate
-    const shop = await prisma.shop.findUnique({
-      where: { id: shopId },
-      select: { settings: true },
-    })
-
-    const shopSettings = (shop?.settings as any) || {}
+    const shopSettings = (shopForSettings?.settings as any) || {}
     const commissionRate = shopSettings.commissionRate || 3.0 // Default 3%
 
     // Calculate commission
@@ -159,101 +159,105 @@ export async function GET(request: NextRequest) {
     const weeklyCommission = (weeklyTotal * commissionRate) / 100
     const monthlyCommission = (monthlyTotal * commissionRate) / 100
 
-    // 9. Get recent transactions (last 10)
-    const recentTransactions = await prisma.sale.findMany({
-      where: {
-        shopId,
-        sellerId: workerId,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: 10,
-      select: {
-        id: true,
-        invoiceNumber: true,
-        totalAmount: true,
-        paymentMethod: true,
-        status: true,
-        saleDate: true,
-        customer: {
-          select: {
-            name: true,
-          },
+    // 9-11. Parallel fetch: recent transactions, pending approvals, and week sales trend
+    const sevenDaysAgo = subDays(startOfDay(now), 6)
+    
+    const [recentTransactions, pendingApprovals, allWeekSales] = await Promise.all([
+      // Recent transactions (last 10)
+      prisma.sale.findMany({
+        where: {
+          shopId,
+          sellerId: workerId,
         },
-        items: {
-          select: {
-            product: {
-              select: {
-                name: true,
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: 10,
+        select: {
+          id: true,
+          invoiceNumber: true,
+          totalAmount: true,
+          paymentMethod: true,
+          status: true,
+          saleDate: true,
+          customer: {
+            select: {
+              name: true,
+            },
+          },
+          items: {
+            select: {
+              product: {
+                select: {
+                  name: true,
+                },
               },
+              quantity: true,
             },
-            quantity: true,
           },
         },
-      },
-    })
-
-    // 10. Get pending approval requests by this worker
-    const pendingApprovals = await prisma.approvalRequest.findMany({
-      where: {
-        workerId,
-        shopId,
-        status: 'PENDING',
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      select: {
-        id: true,
-        type: true,
-        tableName: true,
-        recordId: true,
-        requestData: true,
-        reason: true,
-        status: true,
-        createdAt: true,
-      },
-    })
-
-    // 11. Get sales trend (last 7 days)
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const date = subDays(now, 6 - i)
-      return {
-        date: startOfDay(date),
-        label: date.toLocaleDateString('en-US', { weekday: 'short' }),
-      }
-    })
-
-    const salesTrend = await Promise.all(
-      last7Days.map(async ({ date, label }) => {
-        const dayEnd = endOfDay(date)
-        const sales = await prisma.sale.findMany({
-          where: {
-            shopId,
-            sellerId: workerId,
-            saleDate: {
-              gte: date,
-              lte: dayEnd,
-            },
-          },
-          select: {
-            totalAmount: true,
-          },
-        })
-
-        const total = sales.reduce(
-          (sum, sale) => sum + Number(sale.totalAmount),
-          0
-        )
-
-        return {
-          day: label,
-          sales: total,
-          count: sales.length,
+      }),
+      // Pending approval requests
+      prisma.approvalRequest.findMany({
+        where: {
+          workerId,
+          shopId,
+          status: 'PENDING',
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        select: {
+          id: true,
+          type: true,
+          tableName: true,
+          recordId: true,
+          requestData: true,
+          reason: true,
+          status: true,
+          createdAt: true,
+        },
+      }),
+      // Sales trend (last 7 days) - OPTIMIZED: Single query instead of 7
+      prisma.sale.findMany({
+        where: {
+          shopId,
+          sellerId: workerId,
+          saleDate: {
+            gte: sevenDaysAgo,
+            lte: endOfDay(now)
+          }
+        },
+        select: {
+          totalAmount: true,
+          saleDate: true
         }
       })
-    )
+    ])
+
+    // Group sales by day in memory
+    const salesByDay = new Map<string, { total: number; count: number }>()
+    allWeekSales.forEach(sale => {
+      const dayKey = startOfDay(sale.saleDate).toISOString()
+      const current = salesByDay.get(dayKey) || { total: 0, count: 0 }
+      salesByDay.set(dayKey, {
+        total: current.total + Number(sale.totalAmount),
+        count: current.count + 1
+      })
+    })
+
+    // Build the trend array for last 7 days
+    const salesTrend = Array.from({ length: 7 }, (_, i) => {
+      const date = subDays(now, 6 - i)
+      const dayKey = startOfDay(date).toISOString()
+      const dayLabel = date.toLocaleDateString('en-US', { weekday: 'short' })
+      const dayData = salesByDay.get(dayKey) || { total: 0, count: 0 }
+      return {
+        day: dayLabel,
+        sales: dayData.total,
+        count: dayData.count
+      }
+    })
 
     // 12. Build response
     const response = {

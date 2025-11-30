@@ -28,13 +28,13 @@ export function ProtectedRoute({
   // Show loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardContent className="flex flex-col items-center justify-center p-8">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900">Verifying Access</h3>
-            <p className="text-sm text-gray-600 text-center mt-2">
-              Please wait while we verify your authentication...
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+        <Card className="w-full max-w-xs sm:max-w-sm">
+          <CardContent className="flex flex-col items-center justify-center p-5 sm:p-6">
+            <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-blue-600 mb-3" />
+            <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">Verifying Access</h3>
+            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 text-center mt-1.5">
+              Please wait...
             </p>
           </CardContent>
         </Card>
@@ -47,17 +47,17 @@ export function ProtectedRoute({
     if (fallback) return <>{fallback}</>
     
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Card className="w-full max-w-md border-red-200">
-          <CardContent className="flex flex-col items-center justify-center p-8">
-            <ShieldAlert className="h-12 w-12 text-red-500 mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900">Access Denied</h3>
-            <p className="text-sm text-gray-600 text-center mt-2">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+        <Card className="w-full max-w-xs sm:max-w-sm border-red-200 dark:border-red-800 dark:bg-gray-800">
+          <CardContent className="flex flex-col items-center justify-center p-5 sm:p-6">
+            <ShieldAlert className="h-8 w-8 sm:h-10 sm:w-10 text-red-500 mb-3" />
+            <h3 className="text-sm sm:text-base font-semibold text-red-600 dark:text-red-400">Access Denied</h3>
+            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 text-center mt-1.5">
               You need to be logged in to access this page.
             </p>
             <a 
               href="/login"
-              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+              className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-blue-700 transition-colors"
             >
               Go to Login
             </a>
@@ -72,17 +72,17 @@ export function ProtectedRoute({
     if (fallback) return <>{fallback}</>
     
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Card className="w-full max-w-md border-orange-200">
-          <CardContent className="flex flex-col items-center justify-center p-8">
-            <Shield className="h-12 w-12 text-orange-500 mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900">Insufficient Permissions</h3>
-            <p className="text-sm text-gray-600 text-center mt-2">
-              Your role ({formatUserRole(user.role)}) doesn't have access to this page.
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+        <Card className="w-full max-w-xs sm:max-w-sm border-orange-200 dark:border-orange-800 dark:bg-gray-800">
+          <CardContent className="flex flex-col items-center justify-center p-5 sm:p-6">
+            <Shield className="h-8 w-8 sm:h-10 sm:w-10 text-orange-500 mb-3" />
+            <h3 className="text-sm sm:text-base font-semibold text-orange-600 dark:text-orange-400">Insufficient Permissions</h3>
+            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 text-center mt-1.5">
+              Your role ({formatUserRole(user.role)}) doesn't have access.
             </p>
             <a 
               href="/dashboard"
-              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+              className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-blue-700 transition-colors"
             >
               Go to Dashboard
             </a>
@@ -97,17 +97,17 @@ export function ProtectedRoute({
     if (fallback) return <>{fallback}</>
     
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Card className="w-full max-w-md border-orange-200">
-          <CardContent className="flex flex-col items-center justify-center p-8">
-            <Shield className="h-12 w-12 text-orange-500 mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900">Permission Required</h3>
-            <p className="text-sm text-gray-600 text-center mt-2">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+        <Card className="w-full max-w-xs sm:max-w-sm border-orange-200 dark:border-orange-800 dark:bg-gray-800">
+          <CardContent className="flex flex-col items-center justify-center p-5 sm:p-6">
+            <Shield className="h-8 w-8 sm:h-10 sm:w-10 text-orange-500 mb-3" />
+            <h3 className="text-sm sm:text-base font-semibold text-orange-600 dark:text-orange-400">Permission Required</h3>
+            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 text-center mt-1.5">
               You don't have permission to {requiredPermission.action} {requiredPermission.resource}.
             </p>
             <a 
               href="/dashboard"
-              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+              className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-blue-700 transition-colors"
             >
               Go to Dashboard
             </a>

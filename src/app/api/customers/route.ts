@@ -29,36 +29,64 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams
     const shopId = searchParams.get('shopId')
+    const search = searchParams.get('search') || ''
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '20')
+    const skip = (page - 1) * limit
     
     if (!shopId) {
       return NextResponse.json({ error: 'shopId is required' }, { status: 400 })
     }
 
-    // Get customers with their sales data for statistics
-    const customers = await prisma.customer.findMany({
-      where: {
-        shopId
-      },
-      include: {
-        sales: {
-          select: {
-            id: true,
-            totalAmount: true,
-            createdAt: true
+    // Build where clause
+    const where: {
+      shopId: string
+      OR?: Array<{
+        name?: { contains: string; mode: 'insensitive' }
+        phone?: { contains: string }
+        email?: { contains: string; mode: 'insensitive' }
+      }>
+    } = {
+      shopId
+    }
+
+    // Add search filter if provided
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { phone: { contains: search } },
+        { email: { contains: search, mode: 'insensitive' } }
+      ]
+    }
+
+    // Fetch customers and total count in parallel
+    const [customers, totalCount] = await Promise.all([
+      prisma.customer.findMany({
+        where,
+        include: {
+          sales: {
+            select: {
+              id: true,
+              totalAmount: true,
+              createdAt: true
+            }
+          },
+          loans: {
+            select: {
+              id: true,
+              totalAmount: true,
+              status: true
+            }
           }
         },
-        loans: {
-          select: {
-            id: true,
-            totalAmount: true,
-            status: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    })
+        orderBy: {
+          createdAt: 'desc'
+        },
+        skip,
+        take: limit
+      }),
+      prisma.customer.count({ where })
+    ])
 
     // Transform data to include calculated fields
     const customersWithStats = customers.map(customer => {
@@ -87,7 +115,15 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    return NextResponse.json({ customers: customersWithStats })
+    return NextResponse.json({
+      customers: customersWithStats,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limit)
+      }
+    })
   } catch (error) {
     console.error('Error fetching customers:', error)
     return NextResponse.json(

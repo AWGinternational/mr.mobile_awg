@@ -206,16 +206,37 @@ export async function POST(request: NextRequest) {
 
     const productsToCreate = []
     const errors = []
+    const skippedDuplicates: string[] = []
+
+    // Helper function to generate unique SKU
+    const generateSKU = (name: string, model: string, index: number) => {
+      const nameCode = name.substring(0, 3).toUpperCase().replace(/[^A-Z0-9]/g, 'X')
+      const modelCode = model.substring(0, 3).toUpperCase().replace(/[^A-Z0-9]/g, 'X')
+      const timestamp = Date.now().toString().slice(-6)
+      return `${nameCode}-${modelCode}-${timestamp}-${index}`
+    }
+
+    // Helper function to generate unique barcode
+    const generateBarcode = (index: number) => {
+      const timestamp = Date.now().toString().slice(-10)
+      return `${timestamp}${index.toString().padStart(4, '0')}`
+    }
 
     for (let i = 0; i < products.length; i++) {
       const product = products[i]
       const rowNumber = i + 2 // +2 because CSV is 1-indexed and has header
 
       try {
-        // Validate required fields
-        if (!product.name || !product.model || !product.sku) {
-          errors.push(`Row ${rowNumber}: Missing required fields (name, model, or sku) - name: "${product.name}", model: "${product.model}", sku: "${product.sku}"`)
+        // Validate required fields (name and model required, SKU can be auto-generated)
+        if (!product.name || !product.model) {
+          errors.push(`Row ${rowNumber}: Missing required fields (name or model) - name: "${product.name}", model: "${product.model}"`)
           continue
+        }
+
+        // Auto-generate SKU if missing or blank
+        if (!product.sku || product.sku.trim() === '') {
+          product.sku = generateSKU(product.name, product.model, i + 1)
+          console.log(`Row ${rowNumber}: Auto-generated SKU: ${product.sku}`)
         }
 
         if (!product.category || !product.brand) {
@@ -239,12 +260,54 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Validate product type
+        // Map product type to valid enum value
+        // Valid enum: MOBILE_PHONE, ACCESSORY, SIM_CARD, SERVICE
+        // Any other type gets mapped to ACCESSORY (most generic for accessories/parts)
         const validTypes = ['MOBILE_PHONE', 'ACCESSORY', 'SIM_CARD', 'SERVICE']
-        if (product.type && !validTypes.includes(product.type)) {
-          errors.push(`Row ${rowNumber}: Invalid product type "${product.type}". Must be one of: ${validTypes.join(', ')}`)
-          continue
+        let resolvedType: ProductType = ProductType.ACCESSORY // Default
+        
+        if (product.type) {
+          const typeUpper = String(product.type).toUpperCase().replace(/[^A-Z0-9_]/g, '_')
+          
+          if (validTypes.includes(typeUpper)) {
+            // Exact match to enum
+            resolvedType = typeUpper as ProductType
+          } else {
+            // Map common types to enum values
+            const typeMapping: Record<string, ProductType> = {
+              'PHONE': ProductType.MOBILE_PHONE,
+              'MOBILE': ProductType.MOBILE_PHONE,
+              'SMARTPHONE': ProductType.MOBILE_PHONE,
+              'CELL_PHONE': ProductType.MOBILE_PHONE,
+              'CELLPHONE': ProductType.MOBILE_PHONE,
+              'BATTERY': ProductType.ACCESSORY,
+              'CHARGER': ProductType.ACCESSORY,
+              'CABLE': ProductType.ACCESSORY,
+              'CASE': ProductType.ACCESSORY,
+              'COVER': ProductType.ACCESSORY,
+              'HEADPHONES': ProductType.ACCESSORY,
+              'EARPHONES': ProductType.ACCESSORY,
+              'EARBUDS': ProductType.ACCESSORY,
+              'SCREEN_PROTECTOR': ProductType.ACCESSORY,
+              'TEMPERED_GLASS': ProductType.ACCESSORY,
+              'POWER_BANK': ProductType.ACCESSORY,
+              'ADAPTER': ProductType.ACCESSORY,
+              'HOLDER': ProductType.ACCESSORY,
+              'STAND': ProductType.ACCESSORY,
+              'SIM': ProductType.SIM_CARD,
+              'SIMCARD': ProductType.SIM_CARD,
+              'REPAIR': ProductType.SERVICE,
+              'UNLOCK': ProductType.SERVICE,
+              'UNLOCKING': ProductType.SERVICE,
+            }
+            
+            resolvedType = typeMapping[typeUpper] || ProductType.ACCESSORY
+            console.log(`Row ${rowNumber}: Mapped product type "${product.type}" -> ${resolvedType}`)
+          }
         }
+        
+        // Update product type to resolved value
+        product.type = resolvedType
 
         // Get category and brand IDs
         const categoryId = categoryMap.get(product.category.toLowerCase())
@@ -258,7 +321,7 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Check for duplicate SKU
+        // Check for duplicate SKU - SKIP instead of error
         const existingProduct = await prisma.product.findUnique({
           where: {
             sku_shopId: {
@@ -269,25 +332,43 @@ export async function POST(request: NextRequest) {
         })
 
         if (existingProduct) {
-          errors.push(`Row ${rowNumber}: SKU "${product.sku}" already exists`)
+          skippedDuplicates.push(`Row ${rowNumber}: SKU "${product.sku}" already exists - SKIPPED`)
+          console.log(`⏭️ Row ${rowNumber}: Skipping duplicate SKU "${product.sku}"`)
           continue
         }
 
-        // Check for duplicate barcode if provided
-        if (product.barcode) {
+        // Auto-generate barcode if missing or blank
+        if (!product.barcode || product.barcode.trim() === '') {
+          product.barcode = generateBarcode(i + 1)
+          console.log(`Row ${rowNumber}: Auto-generated barcode: ${product.barcode}`)
+        }
+
+        // Check for duplicate barcode - try to generate new one if exists
+        let barcodeAttempts = 0
+        while (barcodeAttempts < 5) {
           const existingBarcode = await prisma.product.findUnique({
             where: {
               barcode_shopId: {
-                barcode: product.barcode,
+                barcode: product.barcode!,
                 shopId: currentShopId
               }
             }
           })
 
-          if (existingBarcode) {
-            errors.push(`Row ${rowNumber}: Barcode "${product.barcode}" already exists`)
-            continue
+          if (!existingBarcode) {
+            break // Barcode is unique
           }
+
+          // Generate a new barcode
+          barcodeAttempts++
+          product.barcode = generateBarcode(i + 1 + barcodeAttempts * 1000)
+          console.log(`Row ${rowNumber}: Barcode collision, trying new one: ${product.barcode}`)
+        }
+
+        if (barcodeAttempts >= 5) {
+          // Set barcode to null if we can't generate a unique one
+          product.barcode = undefined
+          console.log(`Row ${rowNumber}: Could not generate unique barcode, setting to null`)
         }
 
         // Prepare product data (without stock field)
@@ -320,13 +401,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // If there are validation errors, return them
-    if (errors.length > 0) {
+    // If there are validation errors (not skipped duplicates), return them
+    if (errors.length > 0 && productsToCreate.length === 0) {
       return NextResponse.json({
         error: 'Validation failed',
         details: errors,
+        skippedDuplicates: skippedDuplicates,
         successCount: 0,
-        errorCount: errors.length
+        errorCount: errors.length,
+        skippedCount: skippedDuplicates.length
       }, { status: 400 })
     }
 
@@ -388,14 +471,22 @@ export async function POST(request: NextRequest) {
     const allErrors = [...errors, ...creationErrors]
     
     // Determine success status
-    const isSuccess = createdCount > 0
-    const message = createdCount > 0 
-      ? `Successfully imported ${createdCount} of ${products.length} products`
-      : 'No products were imported'
+    const isSuccess = createdCount > 0 || skippedDuplicates.length > 0
+    let message = ''
+    if (createdCount > 0) {
+      message = `Successfully imported ${createdCount} product(s)`
+    }
+    if (skippedDuplicates.length > 0) {
+      message += message ? `. Skipped ${skippedDuplicates.length} duplicate(s)` : `Skipped ${skippedDuplicates.length} duplicate(s)`
+    }
+    if (!message) {
+      message = 'No products were imported'
+    }
     
     console.log('📊 Import result:', {
       success: isSuccess,
       createdCount,
+      skippedCount: skippedDuplicates.length,
       totalRows: products.length,
       errorCount: allErrors.length
     })
@@ -404,6 +495,8 @@ export async function POST(request: NextRequest) {
       success: isSuccess,
       message: message,
       createdCount,
+      skippedCount: skippedDuplicates.length,
+      skippedDuplicates: skippedDuplicates.length > 0 ? skippedDuplicates : undefined,
       totalRows: products.length,
       errors: allErrors.length > 0 ? allErrors : undefined
     })

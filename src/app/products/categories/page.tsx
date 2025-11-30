@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ProtectedRoute } from '@/components/auth/protected-route'
 import { UserRole } from '@/types'
+import { useNotify } from '@/hooks/use-notifications'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -38,10 +40,11 @@ interface Category {
 
 export default function CategoriesPage() {
   const router = useRouter()
+  const queryClient = useQueryClient()
+  const { success, error: showError } = useNotify()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [categories, setCategories] = useState<Category[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [page, setPage] = useState(1)
   
   // Create/Edit Dialog States
   const [showDialog, setShowDialog] = useState(false)
@@ -52,29 +55,52 @@ export default function CategoriesPage() {
     isActive: true,
     code: ''
   })
-  const [formLoading, setFormLoading] = useState(false)
 
   // Delete Dialog States
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null)
-  const [deleteLoading, setDeleteLoading] = useState(false)
 
+  // Debounced search term
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
+  
   useEffect(() => {
-    fetchCategories()
-  }, [])
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+      setPage(1) // Reset to first page on search
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
 
-  const fetchCategories = async () => {
-    try {
-      setLoading(true)
-      const response = await fetch('/api/categories')
-      const data = await response.json()
-      setCategories(data.data || [])
-    } catch (error) {
-      console.error('Error fetching categories:', error)
-    } finally {
-      setLoading(false)
+  // Fetch categories with React Query
+  const { data: categoriesData, isLoading: loading, error } = useQuery({
+    queryKey: ['categories', debouncedSearchTerm, page],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '20',
+        ...(debouncedSearchTerm && { search: debouncedSearchTerm })
+      })
+      
+      const response = await fetch(`/api/categories?${params}`)
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to fetch categories')
+      }
+      return response.json()
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes
+  })
+
+  const categories = categoriesData?.data || []
+  const pagination = categoriesData?.pagination || { page: 1, limit: 20, totalCount: 0, totalPages: 0 }
+
+  // Show error notification
+  useEffect(() => {
+    if (error) {
+      showError(error instanceof Error ? error.message : 'Failed to load categories')
     }
-  }
+  }, [error, showError])
 
   const handleCreate = () => {
     setEditingCategory(null)
@@ -93,36 +119,40 @@ export default function CategoriesPage() {
     setShowDialog(true)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setFormLoading(true)
-
-    try {
-      const url = editingCategory 
-        ? `/api/categories/${editingCategory.id}`
-        : '/api/categories'
-      
-      const method = editingCategory ? 'PUT' : 'POST'
+  // Mutation for create/update category
+  const categoryMutation = useMutation({
+    mutationFn: async ({ category, data }: { category: Category | null, data: typeof formData }) => {
+      const url = category ? `/api/categories/${category.id}` : '/api/categories'
+      const method = category ? 'PUT' : 'POST'
 
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(data)
       })
 
-      if (response.ok) {
-        setShowDialog(false)
-        fetchCategories()
-      } else {
-        const error = await response.json()
-        alert(error.error || 'Failed to save category')
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to save category')
       }
-    } catch (error) {
-      console.error('Error saving category:', error)
-      alert('Failed to save category')
-    } finally {
-      setFormLoading(false)
+      return response.json()
+    },
+    onSuccess: () => {
+      success(editingCategory ? 'Category updated successfully' : 'Category created successfully')
+      setShowDialog(false)
+      setEditingCategory(null)
+      setFormData({ name: '', description: '', isActive: true, code: '' })
+      // Invalidate and refetch categories
+      queryClient.invalidateQueries({ queryKey: ['categories'] })
+    },
+    onError: (error: Error) => {
+      showError(error.message)
     }
+  })
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    categoryMutation.mutate({ category: editingCategory, data: formData })
   }
 
   const handleDeleteClick = (category: Category) => {
@@ -130,34 +160,38 @@ export default function CategoriesPage() {
     setShowDeleteDialog(true)
   }
 
-  const handleDeleteConfirm = async () => {
-    if (!deletingCategory) return
-
-    setDeleteLoading(true)
-    try {
-      const response = await fetch(`/api/categories/${deletingCategory.id}`, {
+  // Mutation for delete category
+  const deleteMutation = useMutation({
+    mutationFn: async (categoryId: string) => {
+      const response = await fetch(`/api/categories/${categoryId}`, {
         method: 'DELETE'
       })
 
-      if (response.ok) {
-        setShowDeleteDialog(false)
-        setDeletingCategory(null)
-        fetchCategories()
-      } else {
-        const error = await response.json()
-        alert(error.error || 'Failed to delete category')
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to delete category')
       }
-    } catch (error) {
-      console.error('Error deleting category:', error)
-      alert('Failed to delete category')
-    } finally {
-      setDeleteLoading(false)
+      return response.json()
+    },
+    onSuccess: () => {
+      success('Category deleted successfully')
+      setShowDeleteDialog(false)
+      setDeletingCategory(null)
+      // Invalidate and refetch categories
+      queryClient.invalidateQueries({ queryKey: ['categories'] })
+    },
+    onError: (error: Error) => {
+      showError(error.message)
     }
+  })
+
+  const handleDeleteConfirm = () => {
+    if (!deletingCategory) return
+    deleteMutation.mutate(deletingCategory.id)
   }
 
-  const filteredCategories = categories.filter(cat =>
-    cat.name.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  // Server-side filtering is handled by API, no client-side filtering needed
+  const filteredCategories = categories
 
   return (
     <ProtectedRoute allowedRoles={[UserRole.SHOP_OWNER, UserRole.SHOP_WORKER]}>
@@ -224,65 +258,119 @@ export default function CategoriesPage() {
                 <p className="mt-4 text-gray-600 dark:text-gray-400">Loading categories...</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {filteredCategories.map((category) => (
-                  <Card key={category.id} className="hover:shadow-lg transition-shadow">
-                    <CardHeader className="pb-3 p-4">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <CardTitle className="text-base sm:text-lg flex items-center gap-2 truncate">
-                            <Grid className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 shrink-0" />
-                            <span className="truncate">{category.name}</span>
-                          </CardTitle>
-                          <CardDescription className="mt-1 text-xs sm:text-sm line-clamp-2">
-                            {category.description || 'No description'}
-                          </CardDescription>
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {filteredCategories.map((category: Category) => (
+                    <Card key={category.id} className="hover:shadow-lg transition-shadow">
+                      <CardHeader className="pb-3 p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <CardTitle className="text-base sm:text-lg flex items-center gap-2 truncate">
+                              <Grid className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 shrink-0" />
+                              <span className="truncate">{category.name}</span>
+                            </CardTitle>
+                            <CardDescription className="mt-1 text-xs sm:text-sm line-clamp-2">
+                              {category.description || 'No description'}
+                            </CardDescription>
+                          </div>
+                          <Badge variant={(category as any).isActive ? 'default' : 'secondary'} className="shrink-0 text-xs">
+                            {(category as any).isActive ? 'ACTIVE' : 'INACTIVE'}
+                          </Badge>
                         </div>
-                        <Badge variant={(category as any).isActive ? 'default' : 'secondary'} className="shrink-0 text-xs">
-                          {(category as any).isActive ? 'ACTIVE' : 'INACTIVE'}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                          <Package className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                          <span>{category._count?.products || 0} products</span>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-0">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                            <Package className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                            <span>{category._count?.products || 0} products</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEdit(category)}
+                              className="h-7 px-2 sm:h-8 sm:px-3"
+                            >
+                              <Edit3 className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteClick(category)}
+                              className="h-7 px-2 sm:h-8 sm:px-3 text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEdit(category)}
-                            className="h-7 px-2 sm:h-8 sm:px-3"
-                          >
-                            <Edit3 className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDeleteClick(category)}
-                            className="h-7 px-2 sm:h-8 sm:px-3 text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  ))}
 
-                {filteredCategories.length === 0 && (
-                  <div className="col-span-full text-center py-12">
-                    <Grid className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
-                    <p className="text-gray-600 dark:text-gray-400">No categories found</p>
-                    <Button onClick={handleCreate} className="mt-4">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create First Category
-                    </Button>
+                  {filteredCategories.length === 0 && !loading && (
+                    <div className="col-span-full text-center py-12">
+                      <Grid className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+                      <p className="text-gray-600 dark:text-gray-400">No categories found</p>
+                      <Button onClick={handleCreate} className="mt-4">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create First Category
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Pagination Controls */}
+                {pagination.totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Showing {((page - 1) * pagination.limit) + 1} to {Math.min(page * pagination.limit, pagination.totalCount)} of {pagination.totalCount} categories
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                        disabled={page === 1 || loading}
+                      >
+                        Previous
+                      </Button>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                          let pageNum: number
+                          if (pagination.totalPages <= 5) {
+                            pageNum = i + 1
+                          } else if (page <= 3) {
+                            pageNum = i + 1
+                          } else if (page >= pagination.totalPages - 2) {
+                            pageNum = pagination.totalPages - 4 + i
+                          } else {
+                            pageNum = page - 2 + i
+                          }
+                          return (
+                            <Button
+                              key={pageNum}
+                              variant={page === pageNum ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => setPage(pageNum)}
+                              disabled={loading}
+                            >
+                              {pageNum}
+                            </Button>
+                          )
+                        })}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
+                        disabled={page === pagination.totalPages || loading}
+                      >
+                        Next
+                      </Button>
+                    </div>
                   </div>
                 )}
-              </div>
+              </>
             )}
           </main>
         </div>
@@ -344,12 +432,12 @@ export default function CategoriesPage() {
                   variant="outline"
                   onClick={() => setShowDialog(false)}
                   className="flex-1"
-                  disabled={formLoading}
+                  disabled={categoryMutation.isPending}
                 >
                   Cancel
                 </Button>
-                <Button type="submit" className="flex-1" disabled={formLoading}>
-                  {formLoading ? 'Saving...' : editingCategory ? 'Update' : 'Create'}
+                <Button type="submit" className="flex-1" disabled={categoryMutation.isPending}>
+                  {categoryMutation.isPending ? 'Saving...' : editingCategory ? 'Update' : 'Create'}
                 </Button>
               </div>
             </form>
@@ -384,16 +472,16 @@ export default function CategoriesPage() {
                   variant="outline"
                   onClick={() => setShowDeleteDialog(false)}
                   className="flex-1"
-                  disabled={deleteLoading}
+                  disabled={deleteMutation.isPending}
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleDeleteConfirm}
                   className="flex-1 bg-red-600 hover:bg-red-700"
-                  disabled={deleteLoading}
+                  disabled={deleteMutation.isPending}
                 >
-                  {deleteLoading ? 'Deleting...' : 'Delete'}
+                  {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
                 </Button>
               </div>
             </div>

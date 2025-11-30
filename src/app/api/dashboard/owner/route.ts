@@ -36,21 +36,114 @@ export async function GET(request: NextRequest) {
     const now = new Date()
     const todayStart = startOfDay(now)
     const todayEnd = endOfDay(now)
+    const thirtyDaysAgo = subDays(now, 30)
+    const monthStart = startOfMonth(now)
 
-    // Today's sales
-    const todaySales = await prisma.sale.findMany({
-      where: {
-        shopId,
-        saleDate: {
-          gte: todayStart,
-          lte: todayEnd
+    // Parallel fetch: Today's sales, products, recent sales, customers, monthly sales, pending purchases, approvals
+    const [
+      todaySales,
+      products,
+      recentSales,
+      totalCustomers,
+      activeCustomers,
+      monthlySales,
+      pendingPurchases,
+      pendingApprovals
+    ] = await Promise.all([
+      // Today's sales
+      prisma.sale.findMany({
+        where: {
+          shopId,
+          saleDate: {
+            gte: todayStart,
+            lte: todayEnd
+          }
+        },
+        include: {
+          items: true,
+          customer: true
         }
-      },
-      include: {
-        items: true,
-        customer: true
-      }
-    })
+      }),
+      // Products for inventory stats - OPTIMIZED: Only fetch needed fields
+      prisma.product.findMany({
+        where: { shopId, status: 'ACTIVE' },
+        select: {
+          id: true,
+          name: true,
+          costPrice: true,
+          lowStockThreshold: true,
+          inventoryItems: {
+            select: {
+              id: true,
+              status: true
+            }
+          }
+        }
+      }),
+      // Recent sales for top brands (last 30 days) - OPTIMIZED: Only fetch needed fields
+      prisma.sale.findMany({
+        where: {
+          shopId,
+          saleDate: { gte: thirtyDaysAgo }
+        },
+        select: {
+          id: true,
+          totalAmount: true,
+          items: {
+            select: {
+              id: true,
+              totalPrice: true,
+              quantity: true,
+              product: {
+                select: {
+                  brand: {
+                    select: { name: true }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }),
+      // Customers - OPTIMIZED: Use count instead of fetching all records
+      prisma.customer.count({
+        where: { shopId }
+      }),
+      // Active customers count (had sales in last 30 days)
+      prisma.customer.count({
+        where: {
+          shopId,
+          sales: {
+            some: {
+              saleDate: { gte: thirtyDaysAgo }
+            }
+          }
+        }
+      }),
+      // Monthly sales
+      prisma.sale.findMany({
+        where: {
+          shopId,
+          saleDate: { gte: monthStart }
+        }
+      }),
+      // Pending purchases
+      prisma.purchase.findMany({
+        where: {
+          shopId,
+          status: {
+            in: ['DRAFT', 'ORDERED', 'PARTIAL']
+          }
+        }
+      }),
+      // Pending approvals
+      prisma.approvalRequest.findMany({
+        where: {
+          shopId,
+          status: 'PENDING'
+        }
+      })
+    ])
 
     const todaySalesRevenue = todaySales.reduce((sum, sale) => sum + Number(sale.totalAmount), 0)
     const todayTransactions = todaySales.length
@@ -65,53 +158,53 @@ export async function GET(request: NextRequest) {
     const paymentMethods = Array.from(paymentMethodsMap.entries()).map(([name, amount]) => ({
       name,
       amount: Number(amount.toFixed(2)),
-      percentage: Number(((amount / todaySalesRevenue) * 100).toFixed(1))
+      percentage: todaySalesRevenue > 0 ? Number(((amount / todaySalesRevenue) * 100).toFixed(1)) : 0
     }))
 
-    // Last 7 days sales trend
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const date = subDays(now, 6 - i)
-      return {
-        date: startOfDay(date),
-        dateEnd: endOfDay(date),
-        label: format(date, 'MMM dd')
-      }
-    })
-
-    const weekSalesTrend = await Promise.all(
-      last7Days.map(async ({ date, dateEnd, label }) => {
-        const sales = await prisma.sale.findMany({
-          where: {
-            shopId,
-            saleDate: {
-              gte: date,
-              lte: dateEnd
-            }
-          }
-        })
-        
-        const revenue = sales.reduce((sum, sale) => sum + Number(sale.totalAmount), 0)
-        const profit = sales.reduce((sum, sale) => {
-          const saleProfit = Number(sale.totalAmount) - Number(sale.subtotal || 0)
-          return sum + saleProfit
-        }, 0)
-
-        return {
-          date: label,
-          sales: Number(revenue.toFixed(2)),
-          transactions: sales.length,
-          profit: Number(profit.toFixed(2))
+    // Last 7 days sales trend - OPTIMIZED: Single query instead of 7
+    const weekAgo = subDays(now, 6)
+    const weekSalesRaw = await prisma.sale.findMany({
+      where: {
+        shopId,
+        saleDate: {
+          gte: startOfDay(weekAgo),
+          lte: todayEnd
         }
-      })
-    )
-
-    // Inventory stats
-    const products = await prisma.product.findMany({
-      where: { shopId, status: 'ACTIVE' },
-      include: {
-        inventoryItems: true
+      },
+      select: {
+        saleDate: true,
+        totalAmount: true,
+        subtotal: true
       }
     })
+
+    // Group by day in memory (faster than 7 separate DB calls)
+    const salesByDay = new Map<string, { revenue: number; transactions: number; profit: number }>()
+    
+    // Initialize all 7 days
+    for (let i = 0; i < 7; i++) {
+      const date = subDays(now, 6 - i)
+      const label = format(date, 'MMM dd')
+      salesByDay.set(label, { revenue: 0, transactions: 0, profit: 0 })
+    }
+    
+    // Aggregate sales by day
+    weekSalesRaw.forEach(sale => {
+      const label = format(new Date(sale.saleDate), 'MMM dd')
+      const current = salesByDay.get(label)
+      if (current) {
+        current.revenue += Number(sale.totalAmount)
+        current.transactions += 1
+        current.profit += Number(sale.totalAmount) - Number(sale.subtotal || 0)
+      }
+    })
+
+    const weekSalesTrend = Array.from(salesByDay.entries()).map(([date, data]) => ({
+      date,
+      sales: Number(data.revenue.toFixed(2)),
+      transactions: data.transactions,
+      profit: Number(data.profit.toFixed(2))
+    }))
 
     const totalProducts = products.length
     const inStockProducts = products.filter(p => {
@@ -131,26 +224,7 @@ export async function GET(request: NextRequest) {
       return sum + (Number(product.costPrice) * availableCount)
     }, 0)
 
-    // Top selling products (last 30 days)
-    const thirtyDaysAgo = subDays(now, 30)
-    const recentSales = await prisma.sale.findMany({
-      where: {
-        shopId,
-        saleDate: { gte: thirtyDaysAgo }
-      },
-      include: {
-        items: {
-          include: {
-            product: {
-              include: {
-                brand: true,
-                category: true
-              }
-            }
-          }
-        }
-      }
-    })
+    // Top selling products (last 30 days) - already fetched above
 
     // Brand performance
     const brandSalesMap = new Map<string, { sales: number; revenue: number; units: number }>()
@@ -173,19 +247,7 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5)
 
-    // Customer stats
-    const customers = await prisma.customer.findMany({
-      where: { shopId },
-      include: {
-        sales: {
-          where: {
-            saleDate: { gte: thirtyDaysAgo }
-          }
-        }
-      }
-    })
-
-    const activeCustomers = customers.filter(c => c.sales.length > 0).length
+    // Customer stats - already fetched above with count queries (totalCustomers, activeCustomers)
     const totalRevenue = recentSales.reduce((sum, sale) => sum + Number(sale.totalAmount), 0)
 
     // Worker performance (today)
@@ -208,14 +270,7 @@ export async function GET(request: NextRequest) {
       })
     )
 
-    // Monthly summary
-    const monthStart = startOfMonth(now)
-    const monthlySales = await prisma.sale.findMany({
-      where: {
-        shopId,
-        saleDate: { gte: monthStart }
-      }
-    })
+    // Monthly summary - already fetched above
 
     const monthlyRevenue = monthlySales.reduce((sum, sale) => sum + Number(sale.totalAmount), 0)
     const monthlyProfit = monthlySales.reduce((sum, sale) => {
@@ -223,23 +278,7 @@ export async function GET(request: NextRequest) {
       return sum + saleProfit
     }, 0)
 
-    // Pending supplier orders (DRAFT or ORDERED status)
-    const pendingPurchases = await prisma.purchase.findMany({
-      where: {
-        shopId,
-        status: {
-          in: ['DRAFT', 'ORDERED', 'PARTIAL']
-        }
-      }
-    })
-
-    // Pending approval requests from workers
-    const pendingApprovals = await prisma.approvalRequest.findMany({
-      where: {
-        shopId,
-        status: 'PENDING'
-      }
-    })
+    // Pending supplier orders and approvals - already fetched above
 
     return NextResponse.json({
       shop: {
@@ -265,7 +304,7 @@ export async function GET(request: NextRequest) {
         performance: workerPerformance
       },
       customers: {
-        total: customers.length,
+        total: totalCustomers,
         active: activeCustomers
       },
       monthly: {

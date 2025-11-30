@@ -18,33 +18,63 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams
     const shopId = searchParams.get('shopId')
+    const search = searchParams.get('search') || ''
+    const statusFilter = searchParams.get('status') || 'ALL'
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '20')
+    const skip = (page - 1) * limit
     
     if (!shopId) {
       return NextResponse.json({ error: 'shopId is required' }, { status: 400 })
     }
 
-    // Get all products for the shop with their inventory counts
-    const products = await prisma.product.findMany({
-      where: {
-        shopId,
-        status: 'ACTIVE'
-      },
-      include: {
-        category: true,
-        brand: true,
-        inventoryItems: {
-          where: {
-            status: 'IN_STOCK'
+    // Build where clause
+    const where: {
+      shopId: string
+      status: 'ACTIVE'
+      OR?: Array<{
+        name?: { contains: string; mode: 'insensitive' }
+        sku?: { contains: string; mode: 'insensitive' }
+        model?: { contains: string; mode: 'insensitive' }
+      }>
+    } = {
+      shopId,
+      status: 'ACTIVE'
+    }
+
+    // Add search filter if provided
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { sku: { contains: search, mode: 'insensitive' } },
+        { model: { contains: search, mode: 'insensitive' } }
+      ]
+    }
+
+    // Get products with their inventory counts
+    const [products, totalCount] = await Promise.all([
+      prisma.product.findMany({
+        where,
+        include: {
+          category: true,
+          brand: true,
+          inventoryItems: {
+            where: {
+              status: 'IN_STOCK'
+            }
           }
-        }
-      },
-      orderBy: {
-        name: 'asc'
-      }
-    })
+        },
+        orderBy: {
+          name: 'asc'
+        },
+        skip,
+        take: limit
+      }),
+      prisma.product.count({ where })
+    ])
 
     // Transform to inventory format
-    const inventory = products.map(product => {
+    let inventory = products.map(product => {
       const currentStock = product.inventoryItems.length
       let status = 'IN_STOCK'
       
@@ -73,7 +103,20 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    return NextResponse.json({ inventory })
+    // Filter by status if specified (after calculating status)
+    if (statusFilter !== 'ALL') {
+      inventory = inventory.filter(item => item.status === statusFilter)
+    }
+
+    return NextResponse.json({
+      inventory,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limit)
+      }
+    })
   } catch (error) {
     console.error('Error fetching inventory:', error)
     return NextResponse.json(

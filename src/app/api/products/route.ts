@@ -48,6 +48,9 @@ export async function GET(request: NextRequest) {
     const brand = searchParams.get('brand')
     const search = searchParams.get('search')
     const type = searchParams.get('type')
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '50')
+    const skip = (page - 1) * limit
 
     // Get the user's shop ID
     let currentShopId: string | null = null
@@ -98,27 +101,33 @@ export async function GET(request: NextRequest) {
       ]
     }
 
-    const products = await prisma.product.findMany({
-      where,
-      include: {
-        category: {
-          select: { id: true, name: true, code: true }
-        },
-        brand: {
-          select: { id: true, name: true, code: true }
-        },
-        _count: {
-          select: { 
-            inventoryItems: {
-              where: { status: 'IN_STOCK' }
+    // Fetch products and total count in parallel
+    const [products, totalCount] = await prisma.$transaction([
+      prisma.product.findMany({
+        where,
+        include: {
+          category: {
+            select: { id: true, name: true, code: true }
+          },
+          brand: {
+            select: { id: true, name: true, code: true }
+          },
+          _count: {
+            select: { 
+              inventoryItems: {
+                where: { status: 'IN_STOCK' }
+              }
             }
           }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    })
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        skip,
+        take: limit
+      }),
+      prisma.product.count({ where })
+    ])
 
     // Add calculated stock count
     const productsWithStock = products.map(product => ({
@@ -130,9 +139,21 @@ export async function GET(request: NextRequest) {
       markupPercentage: product.markupPercentage ? Number(product.markupPercentage) : null
     }))
 
+    const totalPages = Math.ceil(totalCount / limit)
+    const hasNextPage = page < totalPages
+    const hasPreviousPage = page > 1
+
     return NextResponse.json({
       success: true,
-      products: productsWithStock
+      products: productsWithStock,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages,
+        hasNextPage,
+        hasPreviousPage
+      }
     })
 
   } catch (error) {

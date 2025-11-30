@@ -3,7 +3,10 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export default withAuth(
   function middleware(req: NextRequest) {
-    console.log('Middleware running for:', req.nextUrl.pathname)
+    // Only log in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Middleware running for:', req.nextUrl.pathname)
+    }
     return NextResponse.next()
   },
   {
@@ -11,9 +14,12 @@ export default withAuth(
       authorized: ({ token, req }) => {
         const { pathname } = req.nextUrl
         
-        console.log('Authorization check for:', pathname)
-        console.log('Token exists:', !!token)
-        console.log('User role:', token?.role)
+        // Only log in development
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Authorization check for:', pathname)
+          console.log('Token exists:', !!token)
+          console.log('User role:', token?.role)
+        }
 
         // Always allow access to login and public routes
         if (pathname.startsWith('/login') || pathname === '/' || pathname.startsWith('/api/auth')) {

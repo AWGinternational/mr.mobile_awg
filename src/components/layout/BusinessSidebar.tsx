@@ -214,6 +214,16 @@ export function BusinessSidebar({ isOpen = false, onClose }: SidebarProps) {
       systemModule: 'SALES_REPORTS'
     },
     
+    // 6.5. Reports Dashboard - Comprehensive daily reports
+    { 
+      name: 'Reports', 
+      icon: BarChart3, 
+      path: '/reports/dashboard', 
+      color: 'text-blue-600', 
+      bgColor: 'bg-blue-50',
+      systemModule: 'SALES_REPORTS' // Uses same permission as sales reports
+    },
+    
     // 7. Suppliers - Vendor management
     { 
       name: 'Suppliers', 

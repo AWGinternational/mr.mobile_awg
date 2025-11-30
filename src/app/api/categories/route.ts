@@ -30,10 +30,25 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const isActive = searchParams.get('isActive')
     const search = searchParams.get('search')
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '50')
+    const skip = (page - 1) * limit
 
-    // Get the user's shop ID (assuming first shop for now)
-    const userShops = (session.user as any).shops || []
-    const currentShopId = userShops.length > 0 ? userShops[0].id : null
+    // Get the user's shop ID
+    let currentShopId: string | null = null
+    
+    if (session.user.role === 'SHOP_OWNER' || session.user.role === 'SUPER_ADMIN') {
+      const userShops = (session.user as any).shops || []
+      currentShopId = userShops.length > 0 ? userShops[0].id : null
+    } else if (session.user.role === 'SHOP_WORKER') {
+      const worker = await prisma.shopWorker.findFirst({
+        where: {
+          userId: session.user.id,
+          isActive: true
+        }
+      })
+      currentShopId = worker?.shopId || null
+    }
     
     if (!currentShopId) {
       return NextResponse.json({ error: 'No shop assigned to user' }, { status: 400 })
@@ -54,23 +69,41 @@ export async function GET(request: NextRequest) {
       ]
     }
 
-    const categories = await prisma.category.findMany({
-      where,
-      include: {
-        _count: {
-          select: {
-            products: true
+    // Fetch categories and total count in parallel
+    const [categories, totalCount] = await prisma.$transaction([
+      prisma.category.findMany({
+        where,
+        include: {
+          _count: {
+            select: {
+              products: true
+            }
           }
-        }
-      },
-      orderBy: {
-        name: 'asc'
-      }
-    })
+        },
+        orderBy: {
+          name: 'asc'
+        },
+        skip,
+        take: limit
+      }),
+      prisma.category.count({ where })
+    ])
+
+    const totalPages = Math.ceil(totalCount / limit)
+    const hasNextPage = page < totalPages
+    const hasPreviousPage = page > 1
 
     return NextResponse.json({
       success: true,
-      data: categories
+      data: categories,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages,
+        hasNextPage,
+        hasPreviousPage
+      }
     })
 
   } catch (error) {

@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/use-auth'
 import { useShopSettings } from '@/hooks/use-shop-settings'
 import { ProtectedRoute } from '@/components/auth/protected-route'
@@ -16,6 +17,7 @@ import { BusinessSidebar } from '@/components/layout/BusinessSidebar'
 import { TopNavigation } from '@/components/layout/TopNavigation'
 import { SuccessDialog } from '@/components/ui/success-dialog'
 import { ErrorDialog } from '@/components/ui/error-dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Loader2 } from 'lucide-react'
 import { 
   ShoppingCart,
@@ -30,27 +32,25 @@ import {
   Package,
   User,
   Calculator,
-  Receipt
+  Receipt,
+  X
 } from 'lucide-react'
 
 function POSSystem() {
   const router = useRouter()
   const { user } = useAuth()
   const { settings: shopSettings, loading: settingsLoading } = useShopSettings()
+  const queryClient = useQueryClient()
   
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [cart, setCart] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL')
-  const [categories, setCategories] = useState<any[]>([])
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
-  const [customers, setCustomers] = useState<any[]>([])
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
   const [paymentMethod, setPaymentMethod] = useState('cash')
   const [loading, setLoading] = useState(false)
-  const [productsLoading, setProductsLoading] = useState(false)
-  const [products, setProducts] = useState<any[]>([])
   const [lastSaleId, setLastSaleId] = useState<string | null>(null)
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
   const [scannerError, setScannerError] = useState<string | null>(null)
@@ -58,6 +58,9 @@ function POSSystem() {
   const [saleDetails, setSaleDetails] = useState<any>(null)
   const [showErrorDialog, setShowErrorDialog] = useState(false)
   const [errorDetails, setErrorDetails] = useState<{ message: string; details?: string }>({ message: '' })
+  const [showReceiptDialog, setShowReceiptDialog] = useState(false)
+  const [receiptHtml, setReceiptHtml] = useState<string>('')
+  const [loadingReceipt, setLoadingReceipt] = useState(false)
   
   // Tax percentage from shop settings (dynamically loaded)
   const [taxPercentage, setTaxPercentage] = useState(0) // Default 0% - Owner can configure in settings
@@ -86,100 +89,96 @@ function POSSystem() {
   // NEW: Display limit for products (performance optimization)
   const [displayLimit, setDisplayLimit] = useState(20) // Show only 20 products initially
 
-  // Load categories on mount
+  // Debounce search term to avoid too many API calls
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm)
+  
   useEffect(() => {
-    loadCategories()
-  }, [])
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
 
-  // Load products from API with debouncing
-  useEffect(() => {
-    // Debounce search to avoid too many API calls
-    const timeoutId = setTimeout(() => {
-      loadProducts()
-    }, 300) // Wait 300ms after user stops typing
+  // Fetch categories with React Query
+  const { data: categoriesData } = useQuery({
+    queryKey: ['categories', 'pos'],
+    queryFn: async () => {
+      const response = await fetch('/api/categories?limit=50')
+      if (!response.ok) throw new Error('Failed to fetch categories')
+        const result = await response.json()
+      return result.data || []
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes - categories change infrequently
+    gcTime: 15 * 60 * 1000,
+  })
 
-    return () => clearTimeout(timeoutId)
-  }, [searchTerm, selectedCategory])
+  // Fetch products with React Query (build params in queryFn to ensure sync with queryKey)
+  const {
+    data: productsData,
+    isLoading: productsLoading
+  } = useQuery({
+    queryKey: ['products', 'pos', debouncedSearchTerm, selectedCategory],
+    queryFn: async () => {
+      // Build params directly in queryFn to ensure they match the queryKey
+      const limit = debouncedSearchTerm.length > 0 ? '100' : '30'
+      const params = new URLSearchParams({
+        search: debouncedSearchTerm,
+        limit: limit,
+        status: 'ACTIVE',
+        page: '1'
+      })
+      
+      if (selectedCategory && selectedCategory !== 'ALL') {
+        params.append('category', selectedCategory) // API maps 'category' to categoryId
+      }
+      
+      const response = await fetch(`/api/products?${params.toString()}`)
+      if (!response.ok) {
+        console.error('Failed to load products - Response:', response.status)
+        // Return empty array instead of throwing to prevent UI crashes
+        return []
+      }
+      const data = await response.json()
+      return data.products || []
+    },
+    staleTime: 1 * 60 * 1000, // 1 minute - products change frequently
+    gcTime: 5 * 60 * 1000,
+    enabled: true, // Always enabled
+  })
+
+  // Fetch customers with React Query (only when phone is entered)
+  const {
+    data: customersData
+  } = useQuery({
+    queryKey: ['customers', 'pos', customerPhone],
+    queryFn: async () => {
+      const response = await fetch(`/api/pos/customers?search=${encodeURIComponent(customerPhone)}`)
+      if (!response.ok) throw new Error('Failed to fetch customers')
+        const data = await response.json()
+      return data.customers || []
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 5 * 60 * 1000,
+    enabled: customerPhone.length > 3, // Only search when phone has 3+ characters
+  })
+
+  // Extract data from queries with safety checks
+  const categories = Array.isArray(categoriesData) ? categoriesData : []
+  const products = Array.isArray(productsData) ? productsData : []
+  const customers = Array.isArray(customersData) ? customersData : []
 
   // Load cart on component mount
   useEffect(() => {
     loadCart()
   }, [])
 
-  // Load customers when typing
-  useEffect(() => {
-    if (customerPhone && customerPhone.length > 3) {
-      searchCustomers(customerPhone)
-    }
-  }, [customerPhone])
-
-  const loadCategories = async () => {
-    try {
-      const response = await fetch('/api/categories')
-      if (response.ok) {
-        const result = await response.json()
-        setCategories(result.data || [])
-      }
-    } catch (error) {
-      console.error('Error loading categories:', error)
-    }
-  }
-
-  const loadProducts = async () => {
-    setProductsLoading(true)
-    try {
-      // If no search term, limit to 30 products for performance
-      // With search, show up to 100 results
-      const limit = searchTerm.length > 0 ? '100' : '30'
-      
-      const params = new URLSearchParams({
-        search: searchTerm,
-        limit: limit,
-        status: 'ACTIVE'
-      })
-      
-      // Add category filter if selected
-      if (selectedCategory && selectedCategory !== 'ALL') {
-        params.append('categoryId', selectedCategory)
-      }
-      
-      const response = await fetch(`/api/products?${params}`)
-      if (response.ok) {
-        const data = await response.json()
-        setProducts(data.products || [])
-      } else {
-        console.error('Failed to load products - Response:', response.status)
-        const errorText = await response.text()
-        console.error('Error details:', errorText)
-        // Fallback to mock data if API fails
-        setProducts(mockProducts)
-      }
-    } catch (error) {
-      console.error('Error loading products:', error)
-      // Fallback to mock data
-      setProducts(mockProducts)
-    } finally {
-      setProductsLoading(false)
-    }
-  }
-
-  const searchCustomers = async (phone: string) => {
-    try {
-      const response = await fetch(`/api/pos/customers?search=${encodeURIComponent(phone)}`)
-      if (response.ok) {
-        const data = await response.json()
-        setCustomers(data.customers || [])
-      }
-    } catch (error) {
-      console.error('Error searching customers:', error)
-    }
-  }
-
   const selectCustomer = (customer: any) => {
     setSelectedCustomer(customer)
     setCustomerName(customer.name)
-    setCustomerPhone(customer.phone || '')
-    setCustomers([])
+    const newPhone = customer.phone || ''
+    setCustomerPhone(newPhone)
+    // Clear customers query cache for the old search
+    queryClient.setQueryData(['customers', 'pos', customerPhone], [])
   }
 
   // Mock products for fallback
@@ -305,6 +304,14 @@ function POSSystem() {
   // Global keyboard shortcuts (Ctrl+P, F2, =, 1-9 for quantity)
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Check if user is typing in an input field
+      const activeElement = document.activeElement
+      const isInputFocused = activeElement && (
+        activeElement.tagName === 'INPUT' ||
+        activeElement.tagName === 'TEXTAREA' ||
+        activeElement.getAttribute('contenteditable') === 'true'
+      )
+
       // Ctrl+P or Cmd+P - Print last receipt
       if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
         e.preventDefault()
@@ -320,7 +327,7 @@ function POSSystem() {
       }
       
       // = key - Open calculator
-      if (e.key === '=' && !isSearchFocused && !showCalculator) {
+      if (e.key === '=' && !isSearchFocused && !showCalculator && !isInputFocused) {
         e.preventDefault()
         setShowCalculator(true)
       }
@@ -332,8 +339,8 @@ function POSSystem() {
         setCalculatorValue('')
       }
       
-      // Number keys 1-9 for quick quantity entry (when not in search)
-      if (!isSearchFocused && !showCalculator && /^[1-9]$/.test(e.key)) {
+      // Number keys 1-9 for quick quantity entry (when not in search, calculator, or any input field)
+      if (!isSearchFocused && !showCalculator && !isInputFocused && /^[1-9]$/.test(e.key)) {
         e.preventDefault()
         setQuickQuantity(Number(e.key))
         setShowQuickQuantityInput(true)
@@ -648,7 +655,8 @@ function POSSystem() {
         setTaxPercentage(17)
         
         // Refresh products to update stock levels
-        await loadProducts()
+        // Invalidate products query to refetch
+        queryClient.invalidateQueries({ queryKey: ['products', 'pos'] })
         
         // Show success dialog
         setShowSuccessDialog(true)
@@ -675,24 +683,56 @@ function POSSystem() {
 
   const generateReceipt = async (saleId: string) => {
     try {
-      // Open receipt in new window for printing
-      const receiptWindow = window.open(`/api/pos/receipt/${saleId}`, '_blank', 'width=800,height=600')
-      if (receiptWindow) {
-        receiptWindow.focus()
-      } else {
-        setErrorDetails({
-          message: 'Pop-up Blocked',
-          details: 'Please allow pop-ups to view the receipt. You can also print from the sales page.'
-        })
-        setShowErrorDialog(true)
+      setLoadingReceipt(true)
+      setShowReceiptDialog(true)
+      
+      // Fetch receipt HTML
+      const response = await fetch(`/api/pos/receipt/${saleId}`)
+      if (!response.ok) {
+        throw new Error('Failed to load receipt')
       }
+      const fullHtml = await response.text()
+      
+      // Extract body content from the full HTML
+      const bodyMatch = fullHtml.match(/<body[^>]*>([\s\S]*)<\/body>/i)
+      const bodyContent = bodyMatch ? bodyMatch[1] : fullHtml
+      
+      // Extract style tag content
+      const styleMatch = fullHtml.match(/<style[^>]*>([\s\S]*)<\/style>/i)
+      const styleContent = styleMatch ? styleMatch[1] : ''
+      
+      // Combine style and body content
+      const styledHtml = `
+        <style>
+          ${styleContent}
+          .receipt-container {
+            max-width: 80mm;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+          }
+          @media print {
+            .receipt-container {
+              margin: 0;
+              padding: 10mm;
+            }
+          }
+        </style>
+        <div class="receipt-container">
+          ${bodyContent}
+        </div>
+      `
+      setReceiptHtml(styledHtml)
     } catch (error) {
       console.error('Error generating receipt:', error)
+      setShowReceiptDialog(false)
       setErrorDetails({
         message: 'Receipt Generation Failed',
-        details: error instanceof Error ? error.message : 'Failed to open receipt window'
+        details: error instanceof Error ? error.message : 'Failed to load receipt'
       })
       setShowErrorDialog(true)
+    } finally {
+      setLoadingReceipt(false)
     }
   }
 
@@ -1550,6 +1590,48 @@ function POSSystem() {
           message={errorDetails.message}
           details={errorDetails.details}
         />
+
+        {/* Receipt Dialog */}
+        <Dialog open={showReceiptDialog} onOpenChange={(open) => {
+          setShowReceiptDialog(open)
+          if (!open) {
+            setReceiptHtml('')
+          }
+        }}>
+          <DialogContent className="max-w-lg max-h-[85vh] overflow-hidden flex flex-col p-0 print:max-w-none print:max-h-none print:border-0 print:shadow-none">
+            <DialogHeader className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-gray-700 print:hidden flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <DialogTitle className="text-base sm:text-lg font-semibold">Receipt</DialogTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.print()}
+                  className="flex items-center gap-2 h-8 px-3 text-xs sm:text-sm"
+                >
+                  <Receipt className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">Print</span>
+                </Button>
+              </div>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto bg-white print:bg-white min-h-0">
+              {loadingReceipt ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                  <span className="ml-3 text-gray-600 dark:text-gray-400">Loading receipt...</span>
+                </div>
+              ) : receiptHtml ? (
+                <div 
+                  dangerouslySetInnerHTML={{ __html: receiptHtml }}
+                  className="receipt-content"
+                />
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-gray-600 dark:text-gray-400">No receipt data available</p>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </ProtectedRoute>
   )

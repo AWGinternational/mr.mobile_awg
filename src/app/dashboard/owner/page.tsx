@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
 import { ProtectedRoute } from '@/components/auth/protected-route'
 import { UserRole } from '@/types'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -108,33 +109,29 @@ const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'
 export default function ShopOwnerDashboard() {
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true)
-      setError(null)
+  // Use React Query for caching and automatic refetching
+  const { data: dashboardData, isLoading: loading, error, refetch } = useQuery<DashboardData>({
+    queryKey: ['dashboard', 'owner'],
+    queryFn: async () => {
       const response = await fetch('/api/dashboard/owner')
       
       if (!response.ok) {
         throw new Error('Failed to fetch dashboard data')
       }
       
-      const data = await response.json()
-      setDashboardData(data)
-    } catch (err) {
-      console.error('Dashboard fetch error:', err)
-      setError(err instanceof Error ? err.message : 'Failed to load dashboard')
-    } finally {
-      setLoading(false)
-    }
+      return response.json()
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes - data is fresh for 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache for 10 minutes
+    retry: 1, // Retry once on failure
+  })
+
+  const fetchDashboardData = () => {
+    refetch()
   }
 
-  useEffect(() => {
-    fetchDashboardData()
-  }, [])
+  const errorMessage = error instanceof Error ? error.message : error ? String(error) : 'Failed to load dashboard'
 
   const handleModuleClick = (moduleName: string) => {
     const routes: { [key: string]: string } = {
@@ -239,8 +236,8 @@ export default function ShopOwnerDashboard() {
     }
   ]
 
-  // Only show error screen if there's an actual error AND not currently loading
-  if (error && !loading && !dashboardData) {
+    // Only show error screen if there's an actual error AND not currently loading
+    if (error && !loading && !dashboardData) {
     return (
       <ProtectedRoute allowedRoles={[UserRole.SHOP_OWNER]}>
         <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
@@ -249,7 +246,7 @@ export default function ShopOwnerDashboard() {
               <AlertTriangle className="h-8 w-8 text-red-600 mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Failed to Load</h3>
               <p className="text-sm text-gray-600 dark:text-gray-400 text-center mt-2 mb-4">
-                {error || 'Unable to fetch dashboard data'}
+                {errorMessage || 'Unable to fetch dashboard data'}
               </p>
               <Button onClick={fetchDashboardData}>
                 <RefreshCw className="h-4 w-4 mr-2" />
@@ -295,7 +292,7 @@ export default function ShopOwnerDashboard() {
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Failed to Load Dashboard</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400 text-center mt-2">
-                    {error}
+                    {errorMessage || 'Unable to fetch dashboard data'}
                   </p>
                   <Button
                     onClick={fetchDashboardData}

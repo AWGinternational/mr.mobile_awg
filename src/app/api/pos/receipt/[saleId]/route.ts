@@ -197,12 +197,6 @@ export async function GET(
     <p>Thank you for your business!</p>
     <p>Powered by Mr. Mobile</p>
   </div>
-
-  <script>
-    window.onload = function() {
-      window.print();
-    }
-  </script>
 </body>
 </html>
     `

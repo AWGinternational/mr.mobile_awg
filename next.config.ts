@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   // Vercel automatically handles optimization
   output: process.env.DOCKER_BUILD === 'true' ? "standalone" : undefined,
   
+  // Enable React Strict Mode for better development experience
+  reactStrictMode: true,
+  
   // Disable static page generation for pages using useSearchParams
   // This prevents build errors with client-side routing
   experimental: {
@@ -35,6 +38,7 @@ const nextConfig: NextConfig = {
   },
   
   // Exclude markdown files from webpack processing
+  // Note: This only applies when NOT using Turbopack (--turbo flag)
   webpack: (config) => {
     config.module.rules.push({
       test: /\.md$/,
@@ -42,6 +46,10 @@ const nextConfig: NextConfig = {
     });
     return config;
   },
+  
+  // Turbopack configuration (when using --turbo flag)
+  // Turbopack automatically handles file watching and hot reload
+  // No additional configuration needed for hot reload
   
   // Environment variables to expose to the client
   env: {

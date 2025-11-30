@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Suspense } from "react";
 import { AuthProvider } from "@/providers/auth-provider";
+import { QueryProvider } from "@/providers/query-provider";
 import { NotificationProvider } from "@/contexts/notification-context";
 import { NotificationContainer } from "@/components/ui/notification-container";
 import { ToastProvider } from "@/components/ui/toast-context";
@@ -42,6 +43,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <AuthProvider>
+          <QueryProvider>
           <NotificationProvider>
             <ToastProvider>
               <Suspense fallback={null}>
@@ -52,6 +54,7 @@ export default function RootLayout({
               <Toaster />
             </ToastProvider>
           </NotificationProvider>
+          </QueryProvider>
         </AuthProvider>
       </body>
     </html>
