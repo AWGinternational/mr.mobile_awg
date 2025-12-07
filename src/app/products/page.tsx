@@ -811,10 +811,10 @@ function ProductManagementPage() {
 
   const stats = {
     total: products.length,
-    active: products.filter(p => p.status === 'ACTIVE').length,
-    inStock: products.filter(p => p.stock > p.lowStockThreshold).length,
-    lowStock: products.filter(p => p.stock > 0 && p.stock <= p.lowStockThreshold).length,
-    outOfStock: products.filter(p => p.stock === 0).length
+    active: products.filter((p: { status: string }) => p.status === 'ACTIVE').length,
+    inStock: products.filter((p: { stock: number; lowStockThreshold: number }) => p.stock > p.lowStockThreshold).length,
+    lowStock: products.filter((p: { stock: number; lowStockThreshold: number }) => p.stock > 0 && p.stock <= p.lowStockThreshold).length,
+    outOfStock: products.filter((p: { stock: number }) => p.stock === 0).length
   }
 
   return (

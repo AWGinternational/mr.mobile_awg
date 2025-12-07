@@ -188,7 +188,7 @@ export class ShopDatabaseManager {
           shop: true
         }
       })
-      return workerShops.map((ws: any) => ws.shop).filter(Boolean)
+      return workerShops.map((ws: { shop: unknown }) => ws.shop).filter(Boolean)
     }
 
     return []
