@@ -146,7 +146,7 @@ export function withShopContext(
  */
 export async function getMultiShopContext(_request: NextRequest): Promise<{
   user: { id: string; role: string; email?: string; name?: string }
-  shops: Array<{ id: string; name: string; code: string }>
+  shops: Array<{ id: string; name?: string; code?: string }>
   getShopDB: (shopId: string) => Promise<PrismaClient>
 }> {
   const session = await getServerSession(authOptions)

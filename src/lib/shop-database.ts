@@ -155,7 +155,7 @@ export class ShopDatabaseManager {
    * @param userId - The user ID
    * @param userRole - The user role
    */
-  static async getUserShops(userId: string, userRole: string) {
+  static async getUserShops(userId: string, userRole: string): Promise<Array<{ id: string; name?: string; code?: string }>> {
     if (userRole === 'SUPER_ADMIN') {
       // Super admin can access all shops
       return await masterPrisma.shop.findMany({
@@ -188,7 +188,7 @@ export class ShopDatabaseManager {
           shop: true
         }
       })
-      return workerShops.map((ws: { shop: unknown }) => ws.shop).filter(Boolean)
+      return workerShops.map((ws: { shop: { id: string; name?: string; code?: string } }) => ws.shop).filter(Boolean)
     }
 
     return []

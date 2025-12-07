@@ -39,7 +39,7 @@ export async function createPurchase(data: {
       paidAmount: data.paidAmount || 0,
       dueAmount: data.dueAmount,
       dueDate: data.dueDate,
-      status: data.status || 'PENDING',
+      status: (data.status || 'DRAFT') as 'DRAFT' | 'ORDERED' | 'PARTIAL' | 'RECEIVED' | 'COMPLETED' | 'CANCELLED',
       items: {
         create: data.items
       }
@@ -373,7 +373,7 @@ export async function createApprovalRequest(data: {
       type: data.type,
       tableName: data.tableName,
       recordId: data.recordId,
-      requestData: data.requestData,
+      requestData: data.requestData as Record<string, never>,
       reason: data.reason,
       status: 'PENDING'
     }
@@ -426,7 +426,7 @@ export async function getApprovalRequestsByShop(
   filters?: {
     status?: 'PENDING' | 'APPROVED' | 'REJECTED'
     workerId?: string
-    type?: string
+    type?: 'PRODUCT_UPDATE' | 'PRODUCT_DELETE' | 'INVENTORY_UPDATE' | 'SALE_MODIFICATION' | 'CUSTOMER_UPDATE'
   }
 ) {
   return await prisma.approvalRequest.findMany({

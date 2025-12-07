@@ -1005,7 +1005,7 @@ function ProductManagementPage() {
                 </div>
               ) : (
                 <div className="grid gap-3 sm:gap-4">
-                  {products.map((product) => {
+                  {products.map((product: Product) => {
                     const stockBadge = getStockBadge(product.stock, product.lowStockThreshold)
                     return (
                       <div
@@ -1150,7 +1150,7 @@ function ProductManagementPage() {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {brands.map((brand) => (
+                  {brands.map((brand: Brand) => (
                     <div key={brand.id} className="border border-gray-200 rounded-lg p-4 hover:border-teal-300 hover:shadow-md transition-all group">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 flex-1">
@@ -1209,7 +1209,7 @@ function ProductManagementPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {categories.map((category) => (
+                  {categories.map((category: Category) => (
                     <div key={category.id} className="border border-gray-200 rounded-lg p-4 hover:border-teal-300 hover:shadow-md transition-all group">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3 flex-1">
@@ -1284,7 +1284,7 @@ function ProductManagementPage() {
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
-                        {categories.map(cat => (
+                        {categories.map((cat: Category) => (
                           <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                         ))}
                       </SelectContent>
