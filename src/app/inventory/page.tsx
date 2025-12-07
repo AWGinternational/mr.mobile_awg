@@ -177,6 +177,8 @@ function InventoryManagementPage() {
       success(`${action} ${variables.data.quantity || adjustmentQty} units to stock`)
       // Invalidate and refetch inventory
       queryClient.invalidateQueries({ queryKey: ['inventory', currentShopId] })
+      // Also invalidate products query so product page shows updated stock
+      queryClient.invalidateQueries({ queryKey: ['products'] })
       // Close dialog
       setShowAdjustDialog(false)
       setSelectedItem(null)

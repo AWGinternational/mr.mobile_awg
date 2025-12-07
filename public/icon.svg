@@ -1,0 +1,24 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Circle -->
+  <circle cx="256" cy="256" r="256" fill="#0d9488"/>
+  
+  <!-- Mobile Phone -->
+  <rect x="180" y="120" width="152" height="272" rx="20" fill="white"/>
+  <rect x="192" y="140" width="128" height="220" rx="8" fill="#e5e7eb"/>
+  
+  <!-- Screen glow -->
+  <rect x="200" y="148" width="112" height="180" rx="4" fill="#60a5fa" opacity="0.3"/>
+  
+  <!-- Camera -->
+  <circle cx="256" cy="156" r="4" fill="#374151"/>
+  
+  <!-- Home button -->
+  <circle cx="256" cy="372" r="8" fill="#374151" opacity="0.3"/>
+  
+  <!-- Shop Tag Icon -->
+  <path d="M360 200 L420 200 L420 280 L360 280 L340 240 Z" fill="#fbbf24" stroke="white" stroke-width="4"/>
+  <circle cx="390" cy="240" r="12" fill="white"/>
+  
+  <!-- Price symbol -->
+  <text x="384" y="250" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#0d9488">₨</text>
+</svg>

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Icon Generator - Mr. Mobile</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { color: #0d9488; }
+        .icon-preview {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        .icon-item {
+            text-align: center;
+        }
+        canvas {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        button {
+            background: #0d9488;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #0f766e;
+        }
+        .instructions {
+            background: #fef3c7;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+            border-left: 4px solid #f59e0b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 Mr. Mobile - Icon Generator</h1>
+        
+        <div class="instructions">
+            <strong>Instructions:</strong><br>
+            1. Click "Generate Icons" button below<br>
+            2. Right-click each icon and "Save image as..."<br>
+            3. Save with the exact filenames shown<br>
+            4. Place all files in the <code>public</code> folder
+        </div>
+
+        <button onclick="generateAllIcons()">Generate All Icons</button>
+        <button onclick="downloadAll()">Download All Icons</button>
+
+        <div class="icon-preview" id="iconPreview"></div>
+    </div>
+
+    <script>
+        const sizes = [
+            { size: 32, name: 'icon.png' },
+            { size: 180, name: 'apple-icon.png' },
+            { size: 192, name: 'icon-192.png' },
+            { size: 512, name: 'icon-512.png' }
+        ];
+
+        function drawIcon(canvas, size) {
+            const ctx = canvas.getContext('2d');
+            const scale = size / 512;
+
+            // Background circle
+            ctx.fillStyle = '#0d9488';
+            ctx.beginPath();
+            ctx.arc(size/2, size/2, size/2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Mobile phone body
+            ctx.fillStyle = 'white';
+            const phoneX = 180 * scale;
+            const phoneY = 120 * scale;
+            const phoneW = 152 * scale;
+            const phoneH = 272 * scale;
+            const radius = 20 * scale;
+            
+            ctx.beginPath();
+            ctx.roundRect(phoneX, phoneY, phoneW, phoneH, radius);
+            ctx.fill();
+
+            // Screen
+            ctx.fillStyle = '#e5e7eb';
+            ctx.beginPath();
+            ctx.roundRect(192 * scale, 140 * scale, 128 * scale, 220 * scale, 8 * scale);
+            ctx.fill();
+
+            // Screen glow
+            ctx.fillStyle = '#60a5fa';
+            ctx.globalAlpha = 0.3;
+            ctx.beginPath();
+            ctx.roundRect(200 * scale, 148 * scale, 112 * scale, 180 * scale, 4 * scale);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+
+            // Camera
+            ctx.fillStyle = '#374151';
+            ctx.beginPath();
+            ctx.arc(256 * scale, 156 * scale, 4 * scale, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Home button
+            ctx.fillStyle = '#374151';
+            ctx.globalAlpha = 0.3;
+            ctx.beginPath();
+            ctx.arc(256 * scale, 372 * scale, 8 * scale, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+
+            // Price tag
+            ctx.fillStyle = '#fbbf24';
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 4 * scale;
+            ctx.beginPath();
+            ctx.moveTo(360 * scale, 200 * scale);
+            ctx.lineTo(420 * scale, 200 * scale);
+            ctx.lineTo(420 * scale, 280 * scale);
+            ctx.lineTo(360 * scale, 280 * scale);
+            ctx.lineTo(340 * scale, 240 * scale);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Tag hole
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(390 * scale, 240 * scale, 12 * scale, 0, Math.PI * 2);
+            ctx.fill();
+
+            // PKR symbol
+            ctx.fillStyle = '#0d9488';
+            ctx.font = `bold ${24 * scale}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('₨', 390 * scale, 240 * scale);
+        }
+
+        function generateAllIcons() {
+            const preview = document.getElementById('iconPreview');
+            preview.innerHTML = '';
+
+            sizes.forEach(({ size, name }) => {
+                const container = document.createElement('div');
+                container.className = 'icon-item';
+
+                const canvas = document.createElement('canvas');
+                canvas.width = size;
+                canvas.height = size;
+                canvas.id = `icon-${size}`;
+                
+                drawIcon(canvas, size);
+
+                const label = document.createElement('div');
+                label.innerHTML = `<strong>${name}</strong><br>${size}x${size}px`;
+                label.style.marginTop = '10px';
+
+                container.appendChild(canvas);
+                container.appendChild(label);
+                preview.appendChild(container);
+            });
+        }
+
+        function downloadAll() {
+            sizes.forEach(({ size, name }) => {
+                const canvas = document.getElementById(`icon-${size}`);
+                if (canvas) {
+                    const link = document.createElement('a');
+                    link.download = name;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                }
+            });
+            alert('All icons downloaded! Place them in the public folder.');
+        }
+
+        // Generate on load
+        window.onload = generateAllIcons;
+    </script>
+</body>
+</html>

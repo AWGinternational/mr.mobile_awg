@@ -38,8 +38,21 @@ export async function GET(
     const productId = params.id
 
     // Get the user's shop ID
-    const userShops = (session.user as any).shops || []
-    const currentShopId = userShops.length > 0 ? userShops[0].id : null
+    let currentShopId: string | null = null
+    
+    if (session.user.role === UserRole.SHOP_OWNER || session.user.role === UserRole.SUPER_ADMIN) {
+      const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        include: { ownedShops: { select: { id: true } } }
+      })
+      currentShopId = user?.ownedShops[0]?.id || null
+    } else if (session.user.role === UserRole.SHOP_WORKER) {
+      const worker = await prisma.shopWorker.findFirst({
+        where: { workerId: session.user.id },
+        select: { shopId: true }
+      })
+      currentShopId = worker?.shopId || null
+    }
     
     if (!currentShopId) {
       return NextResponse.json({ error: 'No shop assigned to user' }, { status: 400 })
@@ -118,8 +131,21 @@ export async function PUT(
     const validatedData = updateProductSchema.parse(body)
 
     // Get the user's shop ID
-    const userShops = (session.user as any).shops || []
-    const currentShopId = userShops.length > 0 ? userShops[0].id : null
+    let currentShopId: string | null = null
+    
+    if (session.user.role === UserRole.SHOP_OWNER || session.user.role === UserRole.SUPER_ADMIN) {
+      const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        include: { ownedShops: { select: { id: true } } }
+      })
+      currentShopId = user?.ownedShops[0]?.id || null
+    } else if (session.user.role === UserRole.SHOP_WORKER) {
+      const worker = await prisma.shopWorker.findFirst({
+        where: { workerId: session.user.id },
+        select: { shopId: true }
+      })
+      currentShopId = worker?.shopId || null
+    }
     
     if (!currentShopId) {
       return NextResponse.json({ error: 'No shop assigned to user' }, { status: 400 })
@@ -182,10 +208,25 @@ export async function PUT(
 
     // Update product and add inventory items in a transaction
     const result = await prisma.$transaction(async (tx) => {
+      // Prepare update data with proper Prisma relations
+      const { categoryId, brandId, quantityToAdd, ...restData } = validatedData
+      
+      const updateData: any = { ...restData }
+      
+      // Connect category if provided
+      if (categoryId) {
+        updateData.category = { connect: { id: categoryId } }
+      }
+      
+      // Connect brand if provided
+      if (brandId) {
+        updateData.brand = { connect: { id: brandId } }
+      }
+      
       // Update the product
       const updatedProduct = await tx.product.update({
         where: { id: productId },
-        data: validatedData,
+        data: updateData,
         include: {
           category: {
             select: { id: true, name: true, code: true }
@@ -204,8 +245,7 @@ export async function PUT(
       })
 
       // Add inventory items if quantityToAdd > 0
-      const quantityToAdd = validatedData.quantityToAdd || 0
-      if (quantityToAdd > 0) {
+      if (quantityToAdd && quantityToAdd > 0) {
         const inventoryItems = Array.from({ length: quantityToAdd }, (_, index) => ({
           productId: productId,
           batchNumber: `BATCH-${Date.now()}-${index + 1}`,
@@ -291,14 +331,28 @@ export async function DELETE(
     const productId = params.id
 
     // Get the user's shop ID
-    const userShops = (session.user as any).shops || []
-    const currentShopId = userShops.length > 0 ? userShops[0].id : null
+    let currentShopId: string | null = null
+    
+    if (session.user.role === UserRole.SHOP_OWNER || session.user.role === UserRole.SUPER_ADMIN) {
+      const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        include: { ownedShops: { select: { id: true } } }
+      })
+      currentShopId = user?.ownedShops[0]?.id || null
+    } else if (session.user.role === UserRole.SHOP_WORKER) {
+      const worker = await prisma.shopWorker.findFirst({
+        where: { workerId: session.user.id },
+        select: { shopId: true }
+      })
+      currentShopId = worker?.shopId || null
+    }
     
     if (!currentShopId) {
+      console.error('No shop found for user:', { userId: session.user.id, role: session.user.role })
       return NextResponse.json({ error: 'No shop assigned to user' }, { status: 400 })
     }
 
-    // Check if product exists and has inventory items
+    // Check if product exists and has active inventory items
     const existingProduct = await prisma.product.findFirst({
       where: { 
         id: productId,
@@ -306,32 +360,57 @@ export async function DELETE(
       },
       include: {
         _count: {
-          select: { inventoryItems: true, saleItems: true }
+          select: { 
+            inventoryItems: {
+              where: {
+                status: 'IN_STOCK' // Only count items that are actually in stock
+              }
+            },
+            saleItems: true 
+          }
         }
       }
     })
 
     if (!existingProduct) {
+      console.error('Product not found:', { productId, shopId: currentShopId })
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
-    // Check if product has inventory items or sales
+    // Check if product has active inventory items or sales
     if (existingProduct._count.inventoryItems > 0) {
+      console.log('Cannot delete product - has active inventory:', { 
+        productId, 
+        inventoryCount: existingProduct._count.inventoryItems 
+      })
       return NextResponse.json(
-        { error: 'Cannot delete product with inventory items' },
+        { error: `Cannot delete product with inventory items (${existingProduct._count.inventoryItems} items in stock)` },
         { status: 400 }
       )
     }
 
     if (existingProduct._count.saleItems > 0) {
+      console.log('Cannot delete product - has sales history:', { 
+        productId, 
+        salesCount: existingProduct._count.saleItems 
+      })
       return NextResponse.json(
-        { error: 'Cannot delete product with sales history' },
+        { error: `Cannot delete product with sales history (${existingProduct._count.saleItems} sales)` },
         { status: 400 }
       )
     }
 
-    await prisma.product.delete({
-      where: { id: productId }
+    // Delete the product along with its inventory items (cascade)
+    await prisma.$transaction(async (tx) => {
+      // First delete all inventory items for this product
+      await tx.inventoryItem.deleteMany({
+        where: { productId: productId }
+      })
+      
+      // Then delete the product
+      await tx.product.delete({
+        where: { id: productId }
+      })
     })
 
     return NextResponse.json({

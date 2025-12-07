@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/use-auth'
@@ -38,7 +38,11 @@ import {
   Award,
   Upload,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Info,
+  ChevronDown,
+  ChevronUp,
+  HelpCircle
 } from 'lucide-react'
 import { formatUserRole } from '@/utils/user-formatting'
 
@@ -150,6 +154,7 @@ function ProductManagementPage() {
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importLoading, setImportLoading] = useState(false)
   const [importResults, setImportResults] = useState<any>(null)
+  const [showFieldGuide, setShowFieldGuide] = useState(false)
 
   // Build query params for products
   const productsQueryParams = useMemo(() => {
@@ -190,7 +195,7 @@ function ProductManagementPage() {
       const data = await response.json()
       return data.data || []
     },
-    staleTime: 10 * 60 * 1000, // 10 minutes - categories change less frequently
+    staleTime: 0, // Always refetch on invalidation (categories can be auto-created during import)
   })
 
   // Fetch brands with React Query
@@ -202,62 +207,15 @@ function ProductManagementPage() {
       const data = await response.json()
       return data.data || []
     },
-    staleTime: 10 * 60 * 1000, // 10 minutes - brands change less frequently
+    staleTime: 0, // Always refetch on invalidation (brands can be auto-created during import)
   })
 
-  // Extract data from queries - MEMOIZE to prevent new array references on every render
-  // This is CRITICAL to prevent infinite loops in Select components
-  const products = useMemo(() => productsData?.products || [], [productsData?.products])
-  const categories = useMemo(() => categoriesData || [], [categoriesData])
-  const brands = useMemo(() => brandsData || [], [brandsData])
+  // Extract data from queries
+  const products = productsData?.products || []
+  const categories = categoriesData || []
+  const brands = brandsData || []
   const loading = productsLoading
   const pagination = productsData?.pagination
-
-  // Memoize the category SelectItem list to prevent re-creation on every render
-  // This is ESSENTIAL - without this, React sees new children and re-renders infinitely
-  const categorySelectItems = useMemo(() => {
-    return categories.map((cat: Category) => (
-      <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
-    ))
-  }, [categories])
-
-  // Memoize form SelectItem lists as well
-  const categoryFormSelectItems = useMemo(() => {
-    return categories.map((cat: Category) => (
-      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-    ))
-  }, [categories])
-
-  const brandFormSelectItems = useMemo(() => {
-    return brands.map((brand: Brand) => (
-      <SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>
-    ))
-  }, [brands])
-
-  // Memoize handlers WITHOUT dependencies on filter values
-  // This is CRITICAL - if handlers depend on filter values, they get recreated on every change
-  // which causes Select to see new onValueChange prop, triggering infinite loop
-  const handleStatusFilterChange = useCallback((value: string) => {
-    // Use functional update to avoid depending on statusFilter
-    setStatusFilter((prev) => {
-      // Only update if value actually changed
-      if (prev !== value) {
-        return value
-      }
-      return prev
-    })
-  }, []) // Empty dependency array - handler never changes
-
-  const handleCategoryFilterChange = useCallback((value: string) => {
-    // Use functional update to avoid depending on categoryFilter
-    setCategoryFilter((prev) => {
-      // Only update if value actually changed
-      if (prev !== value) {
-        return value
-      }
-      return prev
-    })
-  }, []) // Empty dependency array - handler never changes
 
   // Handle errors
   useEffect(() => {
@@ -266,20 +224,9 @@ function ProductManagementPage() {
     }
   }, [productsError, showError])
 
-  // Reset to page 1 when filters change (but prevent infinite loop)
-  // Use ref to track previous values and only update when they actually change
-  const prevFiltersRef = useRef({ statusFilter, categoryFilter, searchTerm })
+  // Reset to page 1 when filters change
   useEffect(() => {
-    const prev = prevFiltersRef.current
-    const hasChanged = 
-      prev.statusFilter !== statusFilter || 
-      prev.categoryFilter !== categoryFilter || 
-      prev.searchTerm !== searchTerm
-    
-    if (hasChanged) {
-      setPage(1)
-      prevFiltersRef.current = { statusFilter, categoryFilter, searchTerm }
-    }
+    setPage(1)
   }, [statusFilter, categoryFilter, searchTerm])
 
   // Server-side filtering is now handled by the API, no need for client-side filtering
@@ -681,10 +628,11 @@ function ProductManagementPage() {
         setShowDeleteProductDialog(false)
         setProductToDelete(null)
       } else {
-        throw new Error('Failed to delete product')
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to delete product')
       }
     } catch (error) {
-      showError('Failed to delete product')
+      showError(error instanceof Error ? error.message : 'Failed to delete product')
     } finally {
       setDeleteLoading(false)
     }
@@ -702,10 +650,11 @@ function ProductManagementPage() {
         setShowDeleteBrandDialog(false)
         setBrandToDelete(null)
       } else {
-        throw new Error('Failed to delete brand')
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to delete brand')
       }
     } catch (error) {
-      showError('Failed to delete brand')
+      showError(error instanceof Error ? error.message : 'Failed to delete brand')
     } finally {
       setDeleteLoading(false)
     }
@@ -723,10 +672,11 @@ function ProductManagementPage() {
         setShowDeleteCategoryDialog(false)
         setCategoryToDelete(null)
       } else {
-        throw new Error('Failed to delete category')
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to delete category')
       }
     } catch (error) {
-      showError('Failed to delete category')
+      showError(error instanceof Error ? error.message : 'Failed to delete category')
     } finally {
       setDeleteLoading(false)
     }
@@ -836,8 +786,10 @@ function ProductManagementPage() {
       if (response.ok && result.success) {
         setImportResults(result)
         success(result.message || `Successfully imported ${result.createdCount} products`)
-        // Invalidate products query to refetch
+        // Invalidate all related queries to refetch products, categories, and brands
         queryClient.invalidateQueries({ queryKey: ['products'] })
+        queryClient.invalidateQueries({ queryKey: ['categories'] })
+        queryClient.invalidateQueries({ queryKey: ['brands'] })
         setImportFile(null)
         setShowImportDialog(false)
       } else {
@@ -859,10 +811,10 @@ function ProductManagementPage() {
 
   const stats = {
     total: products.length,
-    active: products.filter((p: Product) => p.status === 'ACTIVE').length,
-    inStock: products.filter((p: Product) => p.stock > p.lowStockThreshold).length,
-    lowStock: products.filter((p: Product) => p.stock > 0 && p.stock <= p.lowStockThreshold).length,
-    outOfStock: products.filter((p: Product) => p.stock === 0).length
+    active: products.filter(p => p.status === 'ACTIVE').length,
+    inStock: products.filter(p => p.stock > p.lowStockThreshold).length,
+    lowStock: products.filter(p => p.stock > 0 && p.stock <= p.lowStockThreshold).length,
+    outOfStock: products.filter(p => p.stock === 0).length
   }
 
   return (
@@ -964,7 +916,7 @@ function ProductManagementPage() {
                     className="pl-10"
                   />
                 </div>
-                <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger>
                     <SelectValue placeholder="Filter by status" />
                   </SelectTrigger>
@@ -975,13 +927,15 @@ function ProductManagementPage() {
                     <SelectItem value="DISCONTINUED">Discontinued</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select value={categoryFilter} onValueChange={handleCategoryFilterChange}>
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                   <SelectTrigger>
                     <SelectValue placeholder="Filter by category" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Categories</SelectItem>
-                    {categorySelectItems}
+                    {categories.map(cat => (
+                      <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -1051,7 +1005,7 @@ function ProductManagementPage() {
                 </div>
               ) : (
                 <div className="grid gap-3 sm:gap-4">
-                  {products.map((product: Product) => {
+                  {products.map((product) => {
                     const stockBadge = getStockBadge(product.stock, product.lowStockThreshold)
                     return (
                       <div
@@ -1196,7 +1150,7 @@ function ProductManagementPage() {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {brands.map((brand: Brand) => (
+                  {brands.map((brand) => (
                     <div key={brand.id} className="border border-gray-200 rounded-lg p-4 hover:border-teal-300 hover:shadow-md transition-all group">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 flex-1">
@@ -1255,7 +1209,7 @@ function ProductManagementPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {categories.map((category: Category) => (
+                  {categories.map((category) => (
                     <div key={category.id} className="border border-gray-200 rounded-lg p-4 hover:border-teal-300 hover:shadow-md transition-all group">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3 flex-1">
@@ -1330,7 +1284,9 @@ function ProductManagementPage() {
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
-                        {categoryFormSelectItems}
+                        {categories.map(cat => (
+                          <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1341,7 +1297,9 @@ function ProductManagementPage() {
                         <SelectValue placeholder="Select brand" />
                       </SelectTrigger>
                       <SelectContent>
-                        {brandFormSelectItems}
+                        {brands.map(brand => (
+                          <SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1635,25 +1593,190 @@ function ProductManagementPage() {
         {/* Import Products Dialog */}
         {showImportDialog && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
-                <h3 className="text-lg font-semibold text-gray-900">Import Products from CSV</h3>
-                <button onClick={() => {setShowImportDialog(false); setImportFile(null); setImportResults(null)}} className="p-2 hover:bg-gray-100 rounded-full">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between sticky top-0 bg-white dark:bg-gray-800">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Import Products from CSV</h3>
+                <button 
+                  onClick={() => {
+                    setShowImportDialog(false)
+                    setImportFile(null)
+                    setImportResults(null)
+                    setShowFieldGuide(false)
+                  }} 
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                >
                   <X className="h-5 w-5" />
                 </button>
               </div>
               <div className="p-6 space-y-6">
-                {/* Instructions */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h4 className="font-semibold text-blue-900 mb-2">Import Instructions</h4>
-                  <ul className="text-sm text-blue-800 space-y-1">
-                    <li>• Download the template CSV file first</li>
-                    <li>• Fill in your product data following the template format</li>
-                    <li>• Required fields: name, model, sku, costPrice, sellingPrice, category, brand</li>
-                    <li>• SKUs must be unique within your shop</li>
-                    <li>• Prices should be in PKR (no currency symbols)</li>
-                    <li>• Categories and brands will be created automatically if they don't exist</li>
+                {/* Quick Instructions */}
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
+                    <Info className="h-5 w-5" />
+                    Quick Start Guide
+                  </h4>
+                  <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
+                    <li className="flex items-start gap-2">
+                      <span className="font-medium min-w-[20px]">1.</span>
+                      <div className="flex-1">
+                        <span className="font-medium">Download template</span> - Click the button below to get the CSV template
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="font-medium min-w-[20px]">2.</span>
+                      <div className="flex-1">
+                        <span className="font-medium">Fill your data</span> - Add your products following the column format
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="font-medium min-w-[20px]">3.</span>
+                      <div className="flex-1">
+                        <span className="font-medium">Upload file</span> - Select your completed CSV file
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="font-medium min-w-[20px]">4.</span>
+                      <div className="flex-1">
+                        <span className="font-medium">Import</span> - Review and import your products
+                      </div>
+                    </li>
                   </ul>
+                  <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-800">
+                    <p className="text-xs text-blue-700 dark:text-blue-300 flex items-center gap-1">
+                      <HelpCircle className="h-3 w-3" />
+                      <span>Expand "Column Reference Guide" below for detailed field explanations</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Detailed Column Guide - Expandable */}
+                <div className="border border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden">
+                  <button 
+                    onClick={() => setShowFieldGuide(!showFieldGuide)}
+                    className="w-full p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <FileSpreadsheet className="h-5 w-5 text-teal-600" />
+                      <span className="font-semibold text-gray-900 dark:text-gray-100">Column Reference Guide</span>
+                      <Badge variant="outline" className="ml-2">16 columns</Badge>
+                    </div>
+                    {showFieldGuide ? <ChevronUp className="h-5 w-5 text-gray-500" /> : <ChevronDown className="h-5 w-5 text-gray-500" />}
+                  </button>
+                  
+                  {showFieldGuide && (
+                    <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                      <div className="p-4 max-h-96 overflow-y-auto space-y-4">
+                        {/* Required Fields Section */}
+                        <div>
+                          <h5 className="font-semibold text-sm text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
+                            <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                            Required Fields
+                          </h5>
+                          <div className="space-y-3">
+                            {/* Name */}
+                            <div className="bg-white dark:bg-gray-900 p-3 rounded border border-gray-200 dark:border-gray-700">
+                              <div className="flex items-start justify-between mb-1">
+                                <span className="font-medium text-sm text-gray-900 dark:text-gray-100">name</span>
+                                <Badge variant="destructive" className="text-xs">Required</Badge>
+                              </div>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Product display name</p>
+                              <div className="text-xs space-y-1">
+                                <p><span className="font-medium text-gray-700 dark:text-gray-300">Format:</span> Text (max 255 characters)</p>
+                                <p className="text-green-700 dark:text-green-400"><span className="font-medium">✓ Valid:</span> "iPhone 15 Pro Max", "Samsung Charger"</p>
+                                <p className="text-red-700 dark:text-red-400"><span className="font-medium">✗ Invalid:</span> "" (empty)</p>
+                              </div>
+                            </div>
+
+                            {/* Model */}
+                            <div className="bg-white dark:bg-gray-900 p-3 rounded border border-gray-200 dark:border-gray-700">
+                              <div className="flex items-start justify-between mb-1">
+                                <span className="font-medium text-sm text-gray-900 dark:text-gray-100">model</span>
+                                <Badge variant="destructive" className="text-xs">Required</Badge>
+                              </div>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Product model or variant</p>
+                              <div className="text-xs space-y-1">
+                                <p className="text-green-700 dark:text-green-400"><span className="font-medium">✓ Valid:</span> "Pro Max 256GB", "Ultra"</p>
+                              </div>
+                            </div>
+
+                            {/* SKU */}
+                            <div className="bg-white dark:bg-gray-900 p-3 rounded border border-gray-200 dark:border-gray-700">
+                              <div className="flex items-start justify-between mb-1">
+                                <span className="font-medium text-sm text-gray-900 dark:text-gray-100">sku</span>
+                                <Badge className="text-xs bg-orange-500">Auto-generated if blank</Badge>
+                              </div>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Stock Keeping Unit - unique product identifier</p>
+                              <div className="text-xs space-y-1">
+                                <p><span className="font-medium text-gray-700 dark:text-gray-300">Validation:</span> Must be unique within your shop</p>
+                                <p className="text-green-700 dark:text-green-400"><span className="font-medium">✓ Valid:</span> "APP-IP15-256"</p>
+                                <p className="text-blue-700 dark:text-blue-400"><span className="font-medium">💡 Tip:</span> Leave blank to auto-generate</p>
+                              </div>
+                            </div>
+
+                            {/* Category & Brand */}
+                            <div className="bg-white dark:bg-gray-900 p-3 rounded border border-gray-200 dark:border-gray-700">
+                              <div className="flex items-start justify-between mb-1">
+                                <span className="font-medium text-sm text-gray-900 dark:text-gray-100">category & brand</span>
+                                <Badge variant="destructive" className="text-xs">Required</Badge>
+                              </div>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Will be created automatically if they don't exist</p>
+                              <div className="text-xs space-y-1">
+                                <p className="text-green-700 dark:text-green-400"><span className="font-medium">✓ Valid:</span> "Smartphones", "Apple"</p>
+                                <p className="text-blue-700 dark:text-blue-400"><span className="font-medium">💡 Tip:</span> Use consistent naming</p>
+                              </div>
+                            </div>
+
+                            {/* Prices */}
+                            <div className="bg-white dark:bg-gray-900 p-3 rounded border border-gray-200 dark:border-gray-700">
+                              <div className="flex items-start justify-between mb-1">
+                                <span className="font-medium text-sm text-gray-900 dark:text-gray-100">costPrice & sellingPrice</span>
+                                <Badge variant="destructive" className="text-xs">Required</Badge>
+                              </div>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">In PKR (no currency symbols)</p>
+                              <div className="text-xs space-y-1">
+                                <p><span className="font-medium text-gray-700 dark:text-gray-300">Validation:</span> sellingPrice must be ≥ costPrice</p>
+                                <p className="text-green-700 dark:text-green-400"><span className="font-medium">✓ Valid:</span> 390000, 420000</p>
+                                <p className="text-red-700 dark:text-red-400"><span className="font-medium">✗ Invalid:</span> "Rs 390000", 0, -100</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Optional Fields Section */}
+                        <div>
+                          <h5 className="font-semibold text-sm text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
+                            <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                            Optional Fields
+                          </h5>
+                          <div className="bg-white dark:bg-gray-900 p-3 rounded border border-gray-200 dark:border-gray-700">
+                            <div className="text-xs space-y-2">
+                              <div><span className="font-medium">barcode:</span> Auto-generated if blank (8-14 digits)</div>
+                              <div><span className="font-medium">description:</span> Product details</div>
+                              <div><span className="font-medium">stock:</span> Initial quantity (default: 1)</div>
+                              <div><span className="font-medium">type:</span> MOBILE_PHONE, ACCESSORY, SIM_CARD, SERVICE</div>
+                              <div><span className="font-medium">lowStockThreshold:</span> Alert level (default: 5)</div>
+                              <div><span className="font-medium">warranty:</span> Months (default: 12)</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Common Errors */}
+                        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+                          <h5 className="font-semibold text-sm text-yellow-900 dark:text-yellow-100 mb-2 flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4" />
+                            Common Errors to Avoid
+                          </h5>
+                          <ul className="text-xs text-yellow-800 dark:text-yellow-200 space-y-1">
+                            <li>• Empty required fields</li>
+                            <li>• Currency symbols in prices (390000 not Rs 390,000)</li>
+                            <li>• Selling price less than cost price</li>
+                            <li>• Duplicate SKUs</li>
+                            <li>• Negative or zero prices</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Template Download */}
@@ -1714,35 +1837,144 @@ function ProductManagementPage() {
                   </div>
                 </div>
 
-                {/* Import Results */}
+                {/* Import Results - Enhanced */}
                 {importResults && (
-                  <div className={`p-4 rounded-lg border ${
-                    importResults.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+                  <div className={`rounded-lg border ${
+                    importResults.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
                   }`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      {importResults.success ? (
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      ) : (
-                        <AlertTriangle className="h-5 w-5 text-red-600" />
-                      )}
-                      <h4 className={`font-semibold ${
-                        importResults.success ? 'text-green-900' : 'text-red-900'
+                    {/* Header */}
+                    <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center gap-2 mb-2">
+                        {importResults.success ? (
+                          <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+                        ) : (
+                          <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
+                        )}
+                        <h4 className={`font-semibold text-lg ${
+                          importResults.success ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'
+                        }`}>
+                          {importResults.success ? 'Import Completed' : 'Import Failed'}
+                        </h4>
+                      </div>
+                      <p className={`text-sm ${
+                        importResults.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'
                       }`}>
-                        {importResults.success ? 'Import Successful' : 'Import Failed'}
-                      </h4>
+                        {importResults.message}
+                      </p>
                     </div>
-                    <p className={`text-sm ${
-                      importResults.success ? 'text-green-800' : 'text-red-800'
-                    }`}>
-                      {importResults.message}
-                    </p>
-                    {importResults.details && Array.isArray(importResults.details) && (
-                      <div className="mt-3">
-                        <p className="text-sm font-medium mb-2">Errors:</p>
+
+                    {/* Statistics */}
+                    <div className="p-4 grid grid-cols-3 gap-3">
+                      <div className="bg-white dark:bg-gray-900 rounded-lg p-3 text-center border border-gray-200 dark:border-gray-700">
+                        <div className="text-2xl font-bold text-green-600 dark:text-green-400">{importResults.createdCount || 0}</div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">Created</div>
+                      </div>
+                      {importResults.skippedCount > 0 && (
+                        <div className="bg-white dark:bg-gray-900 rounded-lg p-3 text-center border border-gray-200 dark:border-gray-700">
+                          <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{importResults.skippedCount}</div>
+                          <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">Skipped</div>
+                        </div>
+                      )}
+                      {importResults.errors && importResults.errors.length > 0 && (
+                        <div className="bg-white dark:bg-gray-900 rounded-lg p-3 text-center border border-gray-200 dark:border-gray-700">
+                          <div className="text-2xl font-bold text-red-600 dark:text-red-400">{importResults.errors.length}</div>
+                          <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">Errors</div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Categorized Errors */}
+                    {importResults.errors && importResults.errors.length > 0 && (
+                      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+                        <h5 className="font-semibold text-sm text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-red-600" />
+                          Validation Errors ({importResults.errors.length})
+                        </h5>
+                        
+                        {/* Categorize errors */}
+                        {(() => {
+                          const missingFields = importResults.errors.filter((e: string) => e.includes('Missing required fields'))
+                          const priceErrors = importResults.errors.filter((e: string) => e.includes('price') && !e.includes('Missing'))
+                          const otherErrors = importResults.errors.filter((e: string) => 
+                            !e.includes('Missing required fields') && 
+                            !e.includes('price')
+                          )
+                          
+                          return (
+                            <div className="space-y-3 max-h-64 overflow-y-auto">
+                              {missingFields.length > 0 && (
+                                <div className="bg-white dark:bg-gray-900 rounded border border-red-200 dark:border-red-800 p-3">
+                                  <p className="font-medium text-xs text-red-900 dark:text-red-100 mb-2">Missing Required Fields ({missingFields.length})</p>
+                                  <ul className="text-xs space-y-1">
+                                    {missingFields.slice(0, 5).map((error: string, index: number) => (
+                                      <li key={index} className="text-red-700 dark:text-red-300 flex items-start gap-1">
+                                        <span className="text-red-500 mt-0.5">•</span>
+                                        <span>{error}</span>
+                                      </li>
+                                    ))}
+                                    {missingFields.length > 5 && (
+                                      <li className="text-red-600 dark:text-red-400 italic">... and {missingFields.length - 5} more</li>
+                                    )}
+                                  </ul>
+                                </div>
+                              )}
+                              
+                              {priceErrors.length > 0 && (
+                                <div className="bg-white dark:bg-gray-900 rounded border border-red-200 dark:border-red-800 p-3">
+                                  <p className="font-medium text-xs text-red-900 dark:text-red-100 mb-2">Price Validation Errors ({priceErrors.length})</p>
+                                  <ul className="text-xs space-y-1">
+                                    {priceErrors.slice(0, 5).map((error: string, index: number) => (
+                                      <li key={index} className="text-red-700 dark:text-red-300 flex items-start gap-1">
+                                        <span className="text-red-500 mt-0.5">•</span>
+                                        <span>{error}</span>
+                                      </li>
+                                    ))}
+                                    {priceErrors.length > 5 && (
+                                      <li className="text-red-600 dark:text-red-400 italic">... and {priceErrors.length - 5} more</li>
+                                    )}
+                                  </ul>
+                                </div>
+                              )}
+                              
+                              {otherErrors.length > 0 && (
+                                <div className="bg-white dark:bg-gray-900 rounded border border-red-200 dark:border-red-800 p-3">
+                                  <p className="font-medium text-xs text-red-900 dark:text-red-100 mb-2">Other Errors ({otherErrors.length})</p>
+                                  <ul className="text-xs space-y-1">
+                                    {otherErrors.slice(0, 5).map((error: string, index: number) => (
+                                      <li key={index} className="text-red-700 dark:text-red-300 flex items-start gap-1">
+                                        <span className="text-red-500 mt-0.5">•</span>
+                                        <span>{error}</span>
+                                      </li>
+                                    ))}
+                                    {otherErrors.length > 5 && (
+                                      <li className="text-red-600 dark:text-red-400 italic">... and {otherErrors.length - 5} more</li>
+                                    )}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })()}
+                      </div>
+                    )}
+
+                    {/* Skipped Duplicates */}
+                    {importResults.skippedDuplicates && importResults.skippedDuplicates.length > 0 && (
+                      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+                        <h5 className="font-semibold text-sm text-orange-900 dark:text-orange-100 mb-3 flex items-center gap-2">
+                          <Info className="h-4 w-4 text-orange-600" />
+                          Skipped Duplicates ({importResults.skippedDuplicates.length})
+                        </h5>
                         <ul className="text-xs space-y-1 max-h-32 overflow-y-auto">
-                          {importResults.details.map((error: string, index: number) => (
-                            <li key={index} className="text-red-700">• {error}</li>
+                          {importResults.skippedDuplicates.slice(0, 10).map((msg: string, index: number) => (
+                            <li key={index} className="text-orange-700 dark:text-orange-300 flex items-start gap-1">
+                              <span className="text-orange-500 mt-0.5">•</span>
+                              <span>{msg}</span>
+                            </li>
                           ))}
+                          {importResults.skippedDuplicates.length > 10 && (
+                            <li className="text-orange-600 dark:text-orange-400 italic">... and {importResults.skippedDuplicates.length - 10} more</li>
+                          )}
                         </ul>
                       </div>
                     )}
@@ -1750,10 +1982,15 @@ function ProductManagementPage() {
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
                   <Button
                     variant="outline"
-                    onClick={() => {setShowImportDialog(false); setImportFile(null); setImportResults(null)}}
+                    onClick={() => {
+                      setShowImportDialog(false)
+                      setImportFile(null)
+                      setImportResults(null)
+                      setShowFieldGuide(false)
+                    }}
                   >
                     Cancel
                   </Button>
