@@ -933,7 +933,7 @@ function ProductManagementPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Categories</SelectItem>
-                    {categories.map(cat => (
+                    {categories.map((cat: { id: string; name: string }) => (
                       <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -1297,7 +1297,7 @@ function ProductManagementPage() {
                         <SelectValue placeholder="Select brand" />
                       </SelectTrigger>
                       <SelectContent>
-                        {brands.map(brand => (
+                        {brands.map((brand: { id: string; name: string }) => (
                           <SelectItem key={brand.id} value={brand.id}>{brand.name}</SelectItem>
                         ))}
                       </SelectContent>

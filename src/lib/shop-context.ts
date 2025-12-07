@@ -81,7 +81,7 @@ export async function getShopContext(request: NextRequest): Promise<ShopContext>
 /**
  * Extract shop ID from request using multiple strategies
  */
-async function getShopIdFromRequest(request: NextRequest, user: any): Promise<string> {
+async function getShopIdFromRequest(request: NextRequest, user: { id: string; role: string; email?: string }): Promise<string> {
   const url = new URL(request.url)
   
   // Strategy 1: URL query parameter (?shopId=xxx)
@@ -119,10 +119,10 @@ async function getShopIdFromRequest(request: NextRequest, user: any): Promise<st
 /**
  * Wrapper for API routes to automatically inject shop context
  */
-export function withShopContext<T extends Record<string, any>>(
-  handler: (context: ShopContext, ...args: any[]) => Promise<Response>
+export function withShopContext(
+  handler: (context: ShopContext, ...args: unknown[]) => Promise<Response>
 ) {
-  return async (request: NextRequest, ...args: any[]): Promise<Response> => {
+  return async (request: NextRequest, ...args: unknown[]): Promise<Response> => {
     try {
       const context = await getShopContext(request)
       return await handler(context, ...args)
@@ -144,8 +144,8 @@ export function withShopContext<T extends Record<string, any>>(
 /**
  * Get multiple shop contexts for super admin operations
  */
-export async function getMultiShopContext(request: NextRequest): Promise<{
-  user: any
+export async function getMultiShopContext(_request: NextRequest): Promise<{
+  user: { id: string; role: string; email?: string; name?: string }
   shops: Array<{ id: string; name: string; code: string }>
   getShopDB: (shopId: string) => Promise<PrismaClient>
 }> {
