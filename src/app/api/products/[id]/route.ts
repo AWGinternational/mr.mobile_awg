@@ -48,7 +48,7 @@ export async function GET(
       currentShopId = user?.ownedShops[0]?.id || null
     } else if (session.user.role === UserRole.SHOP_WORKER) {
       const worker = await prisma.shopWorker.findFirst({
-        where: { workerId: session.user.id },
+        where: { userId: session.user.id },
         select: { shopId: true }
       })
       currentShopId = worker?.shopId || null
@@ -141,7 +141,7 @@ export async function PUT(
       currentShopId = user?.ownedShops[0]?.id || null
     } else if (session.user.role === UserRole.SHOP_WORKER) {
       const worker = await prisma.shopWorker.findFirst({
-        where: { workerId: session.user.id },
+        where: { userId: session.user.id },
         select: { shopId: true }
       })
       currentShopId = worker?.shopId || null
@@ -341,7 +341,7 @@ export async function DELETE(
       currentShopId = user?.ownedShops[0]?.id || null
     } else if (session.user.role === UserRole.SHOP_WORKER) {
       const worker = await prisma.shopWorker.findFirst({
-        where: { workerId: session.user.id },
+        where: { userId: session.user.id },
         select: { shopId: true }
       })
       currentShopId = worker?.shopId || null

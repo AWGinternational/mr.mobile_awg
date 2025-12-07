@@ -39,7 +39,7 @@ export async function createPurchase(data: {
       paidAmount: data.paidAmount || 0,
       dueAmount: data.dueAmount,
       dueDate: data.dueDate,
-      status: data.status || ('PENDING' as any),
+      status: data.status || 'PENDING',
       items: {
         create: data.items
       }
@@ -362,7 +362,7 @@ export async function createApprovalRequest(data: {
   type: 'PRODUCT_UPDATE' | 'PRODUCT_DELETE' | 'INVENTORY_UPDATE' | 'SALE_MODIFICATION' | 'CUSTOMER_UPDATE'
   tableName: string
   recordId: string
-  requestData: any
+  requestData: Record<string, unknown>
   reason?: string
 }) {
   return await prisma.approvalRequest.create({
@@ -432,7 +432,7 @@ export async function getApprovalRequestsByShop(
   return await prisma.approvalRequest.findMany({
     where: {
       shopId,
-      ...(filters as any)
+      ...filters
     },
     orderBy: { createdAt: 'desc' }
   })
