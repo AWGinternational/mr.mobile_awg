@@ -161,14 +161,31 @@ export async function POST(request: NextRequest) {
       if (!categoryMap.has(categoryName.toLowerCase())) {
         console.log(`Creating category: ${categoryName} for shop: ${currentShopId}`)
         try {
-          const newCategory = await prisma.category.create({
-            data: {
+          // Generate a unique code from category name
+          const categoryCode = categoryName
+            .replace(/[^a-zA-Z0-9]/g, '')
+            .substring(0, 10)
+            .toUpperCase() || 'CATEGORY'
+          
+          // Use upsert to handle duplicates gracefully
+          const newCategory = await prisma.category.upsert({
+            where: {
+              code_shopId: {
+                code: categoryCode,
+                shopId: currentShopId
+              }
+            },
+            update: {
+              name: categoryName // Update name if it changed
+            },
+            create: {
               name: categoryName,
-              code: categoryName.substring(0, 3).toUpperCase(),
-              shopId: currentShopId
+              code: categoryCode,
+              shopId: currentShopId,
+              isActive: true
             }
           })
-          console.log(`✅ Category created: ${newCategory.id} - ${newCategory.name}`)
+          console.log(`✅ Category created/updated: ${newCategory.id} - ${newCategory.name}`)
           categoryMap.set(categoryName.toLowerCase(), newCategory.id)
         } catch (error) {
           console.error(`❌ Failed to create category "${categoryName}":`, error)
@@ -186,14 +203,31 @@ export async function POST(request: NextRequest) {
       if (!brandMap.has(brandName.toLowerCase())) {
         console.log(`Creating brand: ${brandName} for shop: ${currentShopId}`)
         try {
-          const newBrand = await prisma.brand.create({
-            data: {
+          // Generate a unique code from brand name
+          const brandCode = brandName
+            .replace(/[^a-zA-Z0-9]/g, '')
+            .substring(0, 10)
+            .toUpperCase() || 'BRAND'
+          
+          // Use upsert to handle duplicates gracefully
+          const newBrand = await prisma.brand.upsert({
+            where: {
+              code_shopId: {
+                code: brandCode,
+                shopId: currentShopId
+              }
+            },
+            update: {
+              name: brandName // Update name if it changed
+            },
+            create: {
               name: brandName,
-              code: brandName.substring(0, 3).toUpperCase(),
-              shopId: currentShopId
+              code: brandCode,
+              shopId: currentShopId,
+              isActive: true
             }
           })
-          console.log(`✅ Brand created: ${newBrand.id} - ${newBrand.name}`)
+          console.log(`✅ Brand created/updated: ${newBrand.id} - ${newBrand.name}`)
           brandMap.set(brandName.toLowerCase(), newBrand.id)
         } catch (error) {
           console.error(`❌ Failed to create brand "${brandName}":`, error)
