@@ -1256,7 +1256,7 @@ function ProductManagementPage() {
         {/* Create Product Dialog */}
         {showCreateDialog && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between sticky top-0 bg-white dark:bg-gray-800">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Add New Product</h3>
                 <button onClick={() => setShowCreateDialog(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full">
@@ -1325,7 +1325,7 @@ function ProductManagementPage() {
                   <Textarea value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} placeholder="Product description..." rows={3} />
                 </div>
               </div>
-              <div className="p-6 border-t border-gray-200 bg-gray-50 flex gap-3">
+              <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex gap-3">
                 <Button variant="outline" onClick={() => setShowCreateDialog(false)} className="flex-1">Cancel</Button>
                 <Button onClick={handleCreate} className="flex-1 bg-blue-600 hover:bg-blue-700">Create Product</Button>
               </div>
@@ -1336,7 +1336,7 @@ function ProductManagementPage() {
         {/* Edit Product Dialog */}
         {showEditDialog && selectedProduct && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between sticky top-0 bg-white dark:bg-gray-800">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Edit Product</h3>
                 <button onClick={() => {setShowEditDialog(false); setSelectedProduct(null); resetForm()}} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full">
@@ -1384,7 +1384,7 @@ function ProductManagementPage() {
                   </div>
                 </div>
               </div>
-              <div className="p-6 border-t border-gray-200 bg-gray-50 flex gap-3">
+              <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex gap-3">
                 <Button variant="outline" onClick={() => {setShowEditDialog(false); setSelectedProduct(null); resetForm()}} className="flex-1">Cancel</Button>
                 <Button onClick={handleUpdate} className="flex-1 bg-blue-600 hover:bg-blue-700">Update Product</Button>
               </div>
@@ -1395,10 +1395,10 @@ function ProductManagementPage() {
         {/* Create Brand Dialog */}
         {showCreateBrand && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
-              <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Add New Brand</h3>
-                <button onClick={() => {setShowCreateBrand(false); setBrandName(''); setBrandCode(''); setBrandDescription('')}} className="p-2 hover:bg-gray-100 rounded-full">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full">
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Add New Brand</h3>
+                <button onClick={() => {setShowCreateBrand(false); setBrandName(''); setBrandCode(''); setBrandDescription('')}} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full">
                   <X className="h-5 w-5" />
                 </button>
               </div>
@@ -1430,7 +1430,7 @@ function ProductManagementPage() {
                   />
                 </div>
               </div>
-              <div className="p-6 border-t border-gray-200 bg-gray-50 flex gap-3">
+              <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex gap-3">
                 <Button variant="outline" onClick={() => {setShowCreateBrand(false); setBrandName(''); setBrandCode(''); setBrandDescription('')}} className="flex-1">
                   Cancel
                 </Button>
@@ -1445,10 +1445,10 @@ function ProductManagementPage() {
         {/* Create Category Dialog */}
         {showCreateCategory && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
-              <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Add New Category</h3>
-                <button onClick={() => {setShowCreateCategory(false); setCategoryName(''); setCategoryCode(''); setCategoryDescription('')}} className="p-2 hover:bg-gray-100 rounded-full">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full">
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Add New Category</h3>
+                <button onClick={() => {setShowCreateCategory(false); setCategoryName(''); setCategoryCode(''); setCategoryDescription('')}} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full">
                   <X className="h-5 w-5" />
                 </button>
               </div>
@@ -1480,7 +1480,7 @@ function ProductManagementPage() {
                   />
                 </div>
               </div>
-              <div className="p-6 border-t border-gray-200 bg-gray-50 flex gap-3">
+              <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex gap-3">
                 <Button variant="outline" onClick={() => {setShowCreateCategory(false); setCategoryName(''); setCategoryCode(''); setCategoryDescription('')}} className="flex-1">
                   Cancel
                 </Button>
@@ -1495,10 +1495,10 @@ function ProductManagementPage() {
         {/* Edit Brand Dialog */}
         {showEditBrand && editingBrand && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
-              <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Edit Brand</h3>
-                <button onClick={() => {setShowEditBrand(false); setEditingBrand(null); setBrandName(''); setBrandCode(''); setBrandDescription('')}} className="p-2 hover:bg-gray-100 rounded-full">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full">
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Edit Brand</h3>
+                <button onClick={() => {setShowEditBrand(false); setEditingBrand(null); setBrandName(''); setBrandCode(''); setBrandDescription('')}} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full">
                   <X className="h-5 w-5" />
                 </button>
               </div>
@@ -1529,7 +1529,7 @@ function ProductManagementPage() {
                   />
                 </div>
               </div>
-              <div className="p-6 border-t border-gray-200 bg-gray-50 flex gap-3">
+              <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex gap-3">
                 <Button variant="outline" onClick={() => {setShowEditBrand(false); setEditingBrand(null); setBrandName(''); setBrandCode(''); setBrandDescription('')}} className="flex-1">
                   Cancel
                 </Button>
@@ -1544,10 +1544,10 @@ function ProductManagementPage() {
         {/* Edit Category Dialog */}
         {showEditCategory && editingCategory && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
-              <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Edit Category</h3>
-                <button onClick={() => {setShowEditCategory(false); setEditingCategory(null); setCategoryName(''); setCategoryCode(''); setCategoryDescription('')}} className="p-2 hover:bg-gray-100 rounded-full">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full">
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Edit Category</h3>
+                <button onClick={() => {setShowEditCategory(false); setEditingCategory(null); setCategoryName(''); setCategoryCode(''); setCategoryDescription('')}} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full">
                   <X className="h-5 w-5" />
                 </button>
               </div>
@@ -1578,7 +1578,7 @@ function ProductManagementPage() {
                   />
                 </div>
               </div>
-              <div className="p-6 border-t border-gray-200 bg-gray-50 flex gap-3">
+              <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex gap-3">
                 <Button variant="outline" onClick={() => {setShowEditCategory(false); setEditingCategory(null); setCategoryName(''); setCategoryCode(''); setCategoryDescription('')}} className="flex-1">
                   Cancel
                 </Button>
