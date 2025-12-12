@@ -5,6 +5,9 @@ import { prisma } from '@/lib/db'
 import { UserRole } from '@/types'
 import { startOfDay, endOfDay, startOfWeek, startOfMonth, subDays, format } from 'date-fns'
 
+// Cache dashboard data for 2 minutes
+export const revalidate = 120
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
