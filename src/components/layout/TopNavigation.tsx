@@ -105,33 +105,33 @@ export function TopNavigation({ onMenuClick }: TopNavigationProps = {}) {
             
             {/* Quick Actions - Always visible for easy access */}
             {user && (user.role === 'SHOP_OWNER' || user.role === 'SHOP_WORKER') && (
-              <div className="hidden sm:flex items-center gap-1 ml-2">
+              <div className="flex items-center gap-1 ml-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => router.push('/dashboard/pos')}
-                  className="bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 hover:from-blue-600 hover:to-blue-700 shadow-sm"
+                  className="bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 hover:from-blue-600 hover:to-blue-700 shadow-sm h-8 px-2 sm:px-3"
                 >
-                  <ShoppingCart className="h-4 w-4 mr-1" />
-                  POS
+                  <ShoppingCart className="h-4 w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">POS</span>
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => router.push('/mobile-services')}
-                  className="bg-gradient-to-r from-green-500 to-green-600 text-white border-0 hover:from-green-600 hover:to-green-700 shadow-sm"
+                  className="bg-gradient-to-r from-green-500 to-green-600 text-white border-0 hover:from-green-600 hover:to-green-700 shadow-sm h-8 px-2 sm:px-3"
                 >
-                  <Wallet className="h-4 w-4 mr-1" />
-                  Service
+                  <Wallet className="h-4 w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Service</span>
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => router.push('/daily-closing')}
-                  className="bg-gradient-to-r from-purple-500 to-purple-600 text-white border-0 hover:from-purple-600 hover:to-purple-700 shadow-sm"
+                  className="bg-gradient-to-r from-purple-500 to-purple-600 text-white border-0 hover:from-purple-600 hover:to-purple-700 shadow-sm h-8 px-2 sm:px-3"
                 >
-                  <Calculator className="h-4 w-4 mr-1" />
-                  Closing
+                  <Calculator className="h-4 w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Closing</span>
                 </Button>
               </div>
             )}
