@@ -150,12 +150,14 @@ jobs:
       - name: 🗄️ Setup test database
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/mrmobile_test
+          DIRECT_URL: postgresql://test:test@localhost:5432/mrmobile_test
         run: |
           npx prisma db push --skip-generate
       
       - name: 🏗️ Build application
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/mrmobile_test
+          DIRECT_URL: postgresql://test:test@localhost:5432/mrmobile_test
           NEXTAUTH_URL: http://localhost:3000
           NEXTAUTH_SECRET: test-secret-for-ci-cd-pipeline
           NODE_ENV: production
