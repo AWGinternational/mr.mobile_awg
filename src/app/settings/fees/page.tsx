@@ -578,7 +578,7 @@ export default function FeesSettingsPage() {
                         onInputChange={(value) => handleInputChange('mobileLoad', value)}
                         onInputBlur={() => handleInputBlur('mobileLoad')}
                         onFeeTypeChange={(isPercentage) => handleFeeTypeChange('mobileLoad', isPercentage)}
-                        onSlabsChange={(useSlabs, slabs) => handleSlabsChange('mobileLoad', useSlabs, slabs)}
+                        onSlabsChange={(useSlabs, slabs) => handleSlabsChange('mobileLoad', useSlabs, slabs || [])}
                       />
                     </div>
                   </div>
@@ -595,7 +595,7 @@ export default function FeesSettingsPage() {
                         onInputChange={(value) => handleInputChange('easypaisaSending', value)}
                         onInputBlur={() => handleInputBlur('easypaisaSending')}
                         onFeeTypeChange={(isPercentage) => handleFeeTypeChange('easypaisaSending', isPercentage)}
-                        onSlabsChange={(useSlabs, slabs) => handleSlabsChange('easypaisaSending', useSlabs, slabs)}
+                        onSlabsChange={(useSlabs, slabs) => handleSlabsChange('easypaisaSending', useSlabs, slabs || [])}
                       />
                       <ServiceFeeCard 
                         service={fees.easypaisaReceiving} 
@@ -606,7 +606,7 @@ export default function FeesSettingsPage() {
                         onInputChange={(value) => handleInputChange('easypaisaReceiving', value)}
                         onInputBlur={() => handleInputBlur('easypaisaReceiving')}
                         onFeeTypeChange={(isPercentage) => handleFeeTypeChange('easypaisaReceiving', isPercentage)}
-                        onSlabsChange={(useSlabs, slabs) => handleSlabsChange('easypaisaReceiving', useSlabs, slabs)}
+                        onSlabsChange={(useSlabs, slabs) => handleSlabsChange('easypaisaReceiving', useSlabs, slabs || [])}
                       />
                     </div>
                   </div>
@@ -623,7 +623,7 @@ export default function FeesSettingsPage() {
                         onInputChange={(value) => handleInputChange('jazzcashSending', value)}
                         onInputBlur={() => handleInputBlur('jazzcashSending')}
                         onFeeTypeChange={(isPercentage) => handleFeeTypeChange('jazzcashSending', isPercentage)}
-                        onSlabsChange={(useSlabs, slabs) => handleSlabsChange('jazzcashSending', useSlabs, slabs)}
+                        onSlabsChange={(useSlabs, slabs) => handleSlabsChange('jazzcashSending', useSlabs, slabs || [])}
                       />
                       <ServiceFeeCard 
                         service={fees.jazzcashReceiving} 
@@ -634,7 +634,7 @@ export default function FeesSettingsPage() {
                         onInputChange={(value) => handleInputChange('jazzcashReceiving', value)}
                         onInputBlur={() => handleInputBlur('jazzcashReceiving')}
                         onFeeTypeChange={(isPercentage) => handleFeeTypeChange('jazzcashReceiving', isPercentage)}
-                        onSlabsChange={(useSlabs, slabs) => handleSlabsChange('jazzcashReceiving', useSlabs, slabs)}
+                        onSlabsChange={(useSlabs, slabs) => handleSlabsChange('jazzcashReceiving', useSlabs, slabs || [])}
                       />
                     </div>
                   </div>
@@ -651,7 +651,7 @@ export default function FeesSettingsPage() {
                         onInputChange={(value) => handleInputChange('bankTransfer', value)}
                         onInputBlur={() => handleInputBlur('bankTransfer')}
                         onFeeTypeChange={(isPercentage) => handleFeeTypeChange('bankTransfer', isPercentage)}
-                        onSlabsChange={(useSlabs, slabs) => handleSlabsChange('bankTransfer', useSlabs, slabs)}
+                        onSlabsChange={(useSlabs, slabs) => handleSlabsChange('bankTransfer', useSlabs, slabs || [])}
                       />
                       <ServiceFeeCard 
                         service={fees.billPayment} 
@@ -662,7 +662,7 @@ export default function FeesSettingsPage() {
                         onInputChange={(value) => handleInputChange('billPayment', value)}
                         onInputBlur={() => handleInputBlur('billPayment')}
                         onFeeTypeChange={(isPercentage) => handleFeeTypeChange('billPayment', isPercentage)}
-                        onSlabsChange={(useSlabs, slabs) => handleSlabsChange('billPayment', useSlabs, slabs)}
+                        onSlabsChange={(useSlabs, slabs) => handleSlabsChange('billPayment', useSlabs, slabs || [])}
                       />
                     </div>
                   </div>
