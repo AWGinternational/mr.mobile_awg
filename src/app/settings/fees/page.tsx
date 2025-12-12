@@ -504,13 +504,13 @@ export default function FeesSettingsPage() {
     }))
   }, [])
 
-  const handleSlabsChange = React.useCallback((serviceKey: keyof ShopFees, useSlabs: boolean, slabs: FeeSlab[]) => {
+  const handleSlabsChange = React.useCallback((serviceKey: keyof ShopFees, useSlabs: boolean, slabs?: FeeSlab[]) => {
     setFees(prev => ({
       ...prev,
       [serviceKey]: {
         ...prev[serviceKey],
         useSlabs,
-        slabs
+        slabs: slabs || []
       }
     }))
   }, [])

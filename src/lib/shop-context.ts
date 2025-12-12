@@ -20,7 +20,7 @@ export interface ShopContext {
     id: string
     name: string
     code: string
-    settings: Record<string, unknown>
+    settings: unknown
     owner: {
       id: string
       name: string
