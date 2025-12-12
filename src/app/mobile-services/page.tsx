@@ -37,6 +37,13 @@ import {
   ArrowRight,
 } from 'lucide-react';
 
+// Fee Slab interface for tiered pricing
+interface FeeSlab {
+  minAmount: number;
+  maxAmount: number;
+  fee: number;
+}
+
 const SERVICE_TYPES = [
   { 
     value: 'EASYPAISA_CASHIN', 
@@ -265,7 +272,7 @@ function MobileServicesPageContent() {
     // If using slab-based fees, find the appropriate slab
     if (commissionInfo.useSlabs && commissionInfo.slabs && commissionInfo.slabs.length > 0) {
       const matchingSlab = commissionInfo.slabs.find(
-        slab => numericAmount >= slab.minAmount && numericAmount <= slab.maxAmount
+        (slab: FeeSlab) => numericAmount >= slab.minAmount && numericAmount <= slab.maxAmount
       );
       return matchingSlab ? matchingSlab.fee : 0;
     }

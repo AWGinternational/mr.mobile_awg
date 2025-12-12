@@ -61,12 +61,12 @@ interface SidebarProps {
 interface SubModule {
   name: string
   path: string
-  icon: any
+  icon: React.ComponentType<{ className?: string }>
 }
 
 interface Module {
   name: string
-  icon: any
+  icon: React.ComponentType<{ className?: string }>
   path?: string
   color: string
   bgColor: string

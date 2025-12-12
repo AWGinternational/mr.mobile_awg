@@ -186,7 +186,7 @@ const ServiceFeeCard = React.memo(({
 }: { 
   service: ServiceFee
   serviceKey: keyof ShopFees
-  icon: any
+  icon: React.ComponentType<{ className?: string }>
   color: string
   inputValue: string
   onInputChange: (value: string) => void
