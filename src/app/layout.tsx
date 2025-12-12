@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Suspense } from "react";
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import { AuthProvider } from "@/providers/auth-provider";
 import { QueryProvider } from "@/providers/query-provider";
 import { NotificationProvider } from "@/contexts/notification-context";
@@ -71,6 +73,8 @@ export default function RootLayout({
               {children}
               <NotificationContainer />
               <Toaster />
+              <Analytics />
+              <SpeedInsights />
             </ToastProvider>
           </NotificationProvider>
           </QueryProvider>
