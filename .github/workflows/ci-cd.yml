@@ -145,6 +145,9 @@ jobs:
         run: npm ci
       
       - name: 🗄️ Generate Prisma Client
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/mrmobile_test
+          DIRECT_URL: postgresql://test:test@localhost:5432/mrmobile_test
         run: npx prisma generate
       
       - name: 🗄️ Setup test database
