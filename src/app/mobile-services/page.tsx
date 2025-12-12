@@ -170,6 +170,9 @@ function MobileServicesPageContent() {
   const [referenceId, setReferenceId] = useState('');
   const [notes, setNotes] = useState('');
   
+  // Actual commission charged (can differ from auto-calculated)
+  const [actualCommission, setActualCommission] = useState('');
+  
   // Keyboard navigation state
   const [selectedServiceIndex, setSelectedServiceIndex] = useState(-1);
   const [selectedProviderIndex, setSelectedProviderIndex] = useState(-1);
@@ -195,25 +198,60 @@ function MobileServicesPageContent() {
 
   // Get commission rate based on service type
   const getCommissionRate = (serviceType: string) => {
-    if (!shopFees) return { rate: 0, isPercentage: false };
+    if (!shopFees) return { rate: 0, isPercentage: false, useSlabs: false, slabs: [] };
     
     switch (serviceType) {
       case 'MOBILE_LOAD':
-        return { rate: shopFees.mobileLoad?.fee || 0, isPercentage: shopFees.mobileLoad?.isPercentage || false };
+        return { 
+          rate: shopFees.mobileLoad?.fee || 0, 
+          isPercentage: shopFees.mobileLoad?.isPercentage || false,
+          useSlabs: shopFees.mobileLoad?.useSlabs || false,
+          slabs: shopFees.mobileLoad?.slabs || []
+        };
       case 'EASYPAISA_CASHIN':
-        return { rate: shopFees.easypaisaSending?.fee || 0, isPercentage: shopFees.easypaisaSending?.isPercentage || false };
+        return { 
+          rate: shopFees.easypaisaSending?.fee || 0, 
+          isPercentage: shopFees.easypaisaSending?.isPercentage || false,
+          useSlabs: shopFees.easypaisaSending?.useSlabs || false,
+          slabs: shopFees.easypaisaSending?.slabs || []
+        };
       case 'EASYPAISA_CASHOUT':
-        return { rate: shopFees.easypaisaReceiving?.fee || 0, isPercentage: shopFees.easypaisaReceiving?.isPercentage || false };
+        return { 
+          rate: shopFees.easypaisaReceiving?.fee || 0, 
+          isPercentage: shopFees.easypaisaReceiving?.isPercentage || false,
+          useSlabs: shopFees.easypaisaReceiving?.useSlabs || false,
+          slabs: shopFees.easypaisaReceiving?.slabs || []
+        };
       case 'JAZZCASH_CASHIN':
-        return { rate: shopFees.jazzcashSending?.fee || 0, isPercentage: shopFees.jazzcashSending?.isPercentage || false };
+        return { 
+          rate: shopFees.jazzcashSending?.fee || 0, 
+          isPercentage: shopFees.jazzcashSending?.isPercentage || false,
+          useSlabs: shopFees.jazzcashSending?.useSlabs || false,
+          slabs: shopFees.jazzcashSending?.slabs || []
+        };
       case 'JAZZCASH_CASHOUT':
-        return { rate: shopFees.jazzcashReceiving?.fee || 0, isPercentage: shopFees.jazzcashReceiving?.isPercentage || false };
+        return { 
+          rate: shopFees.jazzcashReceiving?.fee || 0, 
+          isPercentage: shopFees.jazzcashReceiving?.isPercentage || false,
+          useSlabs: shopFees.jazzcashReceiving?.useSlabs || false,
+          slabs: shopFees.jazzcashReceiving?.slabs || []
+        };
       case 'BANK_TRANSFER':
-        return { rate: shopFees.bankTransfer?.fee || 0, isPercentage: shopFees.bankTransfer?.isPercentage || false };
+        return { 
+          rate: shopFees.bankTransfer?.fee || 0, 
+          isPercentage: shopFees.bankTransfer?.isPercentage || false,
+          useSlabs: shopFees.bankTransfer?.useSlabs || false,
+          slabs: shopFees.bankTransfer?.slabs || []
+        };
       case 'BILL_PAYMENT':
-        return { rate: shopFees.billPayment?.fee || 0, isPercentage: shopFees.billPayment?.isPercentage || false };
+        return { 
+          rate: shopFees.billPayment?.fee || 0, 
+          isPercentage: shopFees.billPayment?.isPercentage || false,
+          useSlabs: shopFees.billPayment?.useSlabs || false,
+          slabs: shopFees.billPayment?.slabs || []
+        };
       default:
-        return { rate: 0, isPercentage: false };
+        return { rate: 0, isPercentage: false, useSlabs: false, slabs: [] };
     }
   };
 
@@ -221,11 +259,41 @@ function MobileServicesPageContent() {
   const selectedService = SERVICE_TYPES.find((s) => s.value === serviceType);
   const numericAmount = parseFloat(amount) || 0;
   const commissionInfo = getCommissionRate(serviceType);
-  const calculatedCommission = commissionInfo.isPercentage 
-    ? (numericAmount * commissionInfo.rate) / 100  // Percentage formula: amount * (rate / 100)
-    : (numericAmount / 1000) * commissionInfo.rate;  // Rate per thousand: (amount / 1000) * rate
+  
+  // Calculate commission based on fee structure
+  const calculatedCommission = (() => {
+    // If using slab-based fees, find the appropriate slab
+    if (commissionInfo.useSlabs && commissionInfo.slabs && commissionInfo.slabs.length > 0) {
+      const matchingSlab = commissionInfo.slabs.find(
+        slab => numericAmount >= slab.minAmount && numericAmount <= slab.maxAmount
+      );
+      return matchingSlab ? matchingSlab.fee : 0;
+    }
+    
+    // Otherwise use percentage or fixed rate
+    if (commissionInfo.isPercentage) {
+      return (numericAmount * commissionInfo.rate) / 100;  // Percentage formula: amount * (rate / 100)
+    } else {
+      return (numericAmount / 1000) * commissionInfo.rate;  // Rate per thousand: (amount / 1000) * rate
+    }
+  })();
+  
   const numericDiscount = parseFloat(discount) || 0;
-  const netCommission = calculatedCommission - numericDiscount;
+  
+  // Auto-sync actualCommission with calculatedCommission when amount changes
+  useEffect(() => {
+    if (amount && parseFloat(amount) > 0) {
+      setActualCommission(calculatedCommission.toFixed(2));
+    } else {
+      setActualCommission('');
+    }
+  }, [calculatedCommission, amount]);
+  
+  // Use actual commission if provided, otherwise use calculated
+  const finalCommission = actualCommission && parseFloat(actualCommission) >= 0
+    ? parseFloat(actualCommission)
+    : calculatedCommission;
+  const netCommission = finalCommission - numericDiscount;
 
   // Keyboard navigation for service selection
   useEffect(() => {
@@ -317,9 +385,7 @@ function MobileServicesPageContent() {
           referenceId: referenceId || null,
           notes: notes || null,
           commissionRate: commissionInfo.rate, // Send calculated rate
-          commission: commissionInfo.isPercentage 
-            ? (numericAmount * commissionInfo.rate) / 100  // Percentage: amount * (rate / 100)
-            : (numericAmount / 1000) * commissionInfo.rate, // Rate per thousand: (amount / 1000) * rate
+          commission: finalCommission, // Use actual commission charged
         }),
       });
 
@@ -344,6 +410,7 @@ function MobileServicesPageContent() {
       setDiscount('0');
       setReferenceId('');
       setNotes('');
+      setActualCommission('');
     } catch (error: any) {
       toast({
         title: '❌ Transaction Failed',
@@ -625,31 +692,60 @@ function MobileServicesPageContent() {
                     {/* Commission Summary */}
                     {amount && parseFloat(amount) > 0 && (
                       <div className={`bg-gradient-to-br ${selectedService?.gradient} rounded-xl p-5 text-white`}>
-                        <div className="flex items-center justify-between text-sm mb-3">
-                          <span className="opacity-90">Commission Breakdown</span>
+                        <div className="flex items-center justify-between text-sm mb-4">
+                          <span className="opacity-90 font-medium">Commission Details</span>
                         </div>
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-center">
-                            <span className="flex items-center gap-2">
-                              <Plus className="h-4 w-4" />
-                              Commission {commissionInfo.isPercentage ? `(${commissionInfo.rate}%)` : `(PKR ${commissionInfo.rate})`}
-                            </span>
-                            <span className="font-semibold">Rs {calculatedCommission.toFixed(2)}</span>
+                        <div className="space-y-4">
+                          {/* Auto-calculated commission (reference) */}
+                          <div className="bg-white/10 rounded-lg p-3">
+                            <div className="flex justify-between items-center text-sm opacity-90 mb-1">
+                              <span>Auto Calculated {commissionInfo.isPercentage ? `(${commissionInfo.rate}%)` : `(PKR ${commissionInfo.rate}/1000)`}</span>
+                              <span className="text-xs">Suggested</span>
+                            </div>
+                            <div className="text-2xl font-bold">Rs {calculatedCommission.toFixed(2)}</div>
                           </div>
-                          <div className="flex justify-between items-center">
-                            <span className="flex items-center gap-2">
-                              <Minus className="h-4 w-4" />
-                              Discount
-                            </span>
-                            <span className="font-semibold">Rs {numericDiscount.toFixed(2)}</span>
+
+                          {/* Actual amount charged (editable) */}
+                          <div>
+                            <Label className="text-white/90 text-sm mb-2 block">
+                              💰 Actual Amount You Charged
+                            </Label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xl font-bold text-white/70">₨</span>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={actualCommission}
+                                onChange={(e) => setActualCommission(e.target.value)}
+                                placeholder={calculatedCommission.toFixed(2)}
+                                className="pl-10 h-14 text-xl font-bold bg-white/20 border-white/30 text-white placeholder:text-white/40 focus-visible:ring-white/50 focus-visible:border-white/50"
+                              />
+                            </div>
+                            <p className="text-xs opacity-70 mt-1.5">
+                              💡 Adjust if you charged different (e.g., round 15→20 or 45→50)
+                            </p>
                           </div>
-                          <div className="border-t border-white/20 pt-2 mt-2">
-                            <div className="flex justify-between items-center text-lg font-bold">
-                              <span className="flex items-center gap-2">
+
+                          {/* Discount */}
+                          {numericDiscount > 0 && (
+                            <div className="flex justify-between items-center text-sm border-t border-white/20 pt-3">
+                              <span className="flex items-center gap-2 opacity-90">
+                                <Minus className="h-4 w-4" />
+                                Discount Given
+                              </span>
+                              <span className="font-semibold">Rs {numericDiscount.toFixed(2)}</span>
+                            </div>
+                          )}
+
+                          {/* Net commission */}
+                          <div className="border-t border-white/30 pt-3 mt-2">
+                            <div className="flex justify-between items-center">
+                              <span className="flex items-center gap-2 text-lg font-medium">
                                 <ArrowRight className="h-5 w-5" />
                                 You Earn
                               </span>
-                              <span>Rs {netCommission.toFixed(2)}</span>
+                              <span className="text-2xl font-bold">Rs {netCommission.toFixed(2)}</span>
                             </div>
                           </div>
                         </div>
@@ -677,6 +773,7 @@ function MobileServicesPageContent() {
                           setDiscount('0');
                           setReferenceId('');
                           setNotes('');
+                          setActualCommission('');
                         }}
                         className="h-12 px-6 border-2 font-medium"
                       >

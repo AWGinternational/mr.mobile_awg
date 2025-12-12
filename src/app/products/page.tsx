@@ -98,6 +98,7 @@ function ProductManagementPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [brandFilter, setBrandFilter] = useState<string>('all')
   const [page, setPage] = useState(1)
   const [limit] = useState(50) // 50 products per page
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -163,9 +164,10 @@ function ProductManagementPage() {
     params.append('limit', limit.toString())
     if (statusFilter !== 'all') params.append('status', statusFilter)
     if (categoryFilter !== 'all') params.append('category', categoryFilter)
+    if (brandFilter !== 'all') params.append('brand', brandFilter)
     if (searchTerm) params.append('search', searchTerm)
     return params.toString()
-  }, [page, limit, statusFilter, categoryFilter, searchTerm])
+  }, [page, limit, statusFilter, categoryFilter, brandFilter, searchTerm])
 
   // Fetch products with React Query
   const {
@@ -173,7 +175,7 @@ function ProductManagementPage() {
     isLoading: productsLoading,
     error: productsError
   } = useQuery({
-    queryKey: ['products', page, limit, statusFilter, categoryFilter, searchTerm],
+    queryKey: ['products', page, limit, statusFilter, categoryFilter, brandFilter, searchTerm],
     queryFn: async () => {
       const response = await fetch(`/api/products?${productsQueryParams}`)
       if (!response.ok) {
@@ -227,7 +229,7 @@ function ProductManagementPage() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setPage(1)
-  }, [statusFilter, categoryFilter, searchTerm])
+  }, [statusFilter, categoryFilter, brandFilter, searchTerm])
 
   // Server-side filtering is now handled by the API, no need for client-side filtering
 
@@ -905,7 +907,7 @@ function ProductManagementPage() {
                   {/* Search and Filters */}
                   <Card>
                     <CardContent className="p-4 sm:p-6">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                         <div className="relative sm:col-span-2">
                           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
                           <Input
@@ -935,6 +937,17 @@ function ProductManagementPage() {
                     <SelectItem value="all">All Categories</SelectItem>
                     {categories.map((cat: { id: string; name: string }) => (
                       <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={brandFilter} onValueChange={setBrandFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filter by brand" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Brands</SelectItem>
+                    {brands.map((brand: { id: string; name: string }) => (
+                      <SelectItem key={brand.id} value={brand.name}>{brand.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

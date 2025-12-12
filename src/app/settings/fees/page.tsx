@@ -25,8 +25,16 @@ import {
 
 interface ServiceFee {
   serviceName: string
-  fee: number // Fee amount (in PKR or %)
+  fee: number // Fee amount (in PKR or %) - used for simple fixed/percentage
   isPercentage: boolean // true = percentage, false = fixed amount
+  useSlabs?: boolean // true = use slab-based fees, false = use simple fee
+  slabs?: FeeSlab[] // Array of fee slabs for tiered pricing
+}
+
+interface FeeSlab {
+  minAmount: number // Minimum amount in range (inclusive)
+  maxAmount: number // Maximum amount in range (inclusive), use Infinity for last slab
+  fee: number // Fee for this slab
 }
 
 interface ShopFees {
@@ -52,37 +60,51 @@ const DEFAULT_FEES: ShopFees = {
   mobileLoad: {
     serviceName: 'Mobile Load',
     fee: 0,
-    isPercentage: false
+    isPercentage: false,
+    useSlabs: false,
+    slabs: []
   },
   easypaisaSending: {
     serviceName: 'EasyPaisa - Sending',
     fee: 0,
-    isPercentage: false
+    isPercentage: false,
+    useSlabs: false,
+    slabs: []
   },
   easypaisaReceiving: {
     serviceName: 'EasyPaisa - Receiving',
     fee: 0,
-    isPercentage: false
+    isPercentage: false,
+    useSlabs: false,
+    slabs: []
   },
   jazzcashSending: {
     serviceName: 'JazzCash - Sending',
     fee: 0,
-    isPercentage: false
+    isPercentage: false,
+    useSlabs: false,
+    slabs: []
   },
   jazzcashReceiving: {
     serviceName: 'JazzCash - Receiving',
     fee: 0,
-    isPercentage: false
+    isPercentage: false,
+    useSlabs: false,
+    slabs: []
   },
   bankTransfer: {
     serviceName: 'Bank Transfer',
     fee: 0,
-    isPercentage: false
+    isPercentage: false,
+    useSlabs: false,
+    slabs: []
   },
   billPayment: {
     serviceName: 'Bill Payment',
     fee: 0,
-    isPercentage: false
+    isPercentage: false,
+    useSlabs: false,
+    slabs: []
   }
 }
 
@@ -96,6 +118,60 @@ const SERVICE_DESCRIPTIONS: Record<keyof ShopFees, string> = {
   billPayment: 'Fee charged per utility bill payment'
 }
 
+// Auto-generate default slabs (0-1000: 10, 1001-2000: 20, etc.)
+const generateDefaultSlabs = (maxAmount: number = 20000, increment: number = 1000, feeIncrement: number = 10): FeeSlab[] => {
+  const slabs: FeeSlab[] = []
+  let currentMin = 0
+  let currentFee = feeIncrement
+  
+  while (currentMin < maxAmount) {
+    const currentMax = currentMin + increment
+    slabs.push({
+      minAmount: currentMin,
+      maxAmount: currentMax,
+      fee: currentFee
+    })
+    currentMin = currentMax + 1
+    currentFee += feeIncrement
+  }
+  
+  // Add final slab for anything above maxAmount
+  slabs.push({
+    minAmount: maxAmount + 1,
+    maxAmount: Infinity,
+    fee: currentFee
+  })
+  
+  return slabs
+}
+
+const formatSlabs = (slabs: FeeSlab[]): string => {
+  return slabs.map(slab => {
+    const max = slab.maxAmount === Infinity ? '∞' : slab.maxAmount.toString()
+    return `${slab.minAmount}-${max}:${slab.fee}`
+  }).join(', ')
+}
+
+const parseSlabs = (input: string): FeeSlab[] => {
+  if (!input.trim()) return []
+  
+  const slabs: FeeSlab[] = []
+  const parts = input.split(',').map(p => p.trim())
+  
+  for (const part of parts) {
+    const match = part.match(/^(\d+)-([∞\d]+):(\d+(?:\.\d+)?)$/)
+    if (match) {
+      const minAmount = parseInt(match[1])
+      const maxAmount = match[2] === '∞' ? Infinity : parseInt(match[2])
+      const fee = parseFloat(match[3])
+      
+      slabs.push({ minAmount, maxAmount, fee })
+    }
+  }
+  
+  return slabs
+}
+
 // ServiceFeeCard component - defined outside to prevent recreation
 const ServiceFeeCard = React.memo(({ 
   service, 
@@ -105,7 +181,8 @@ const ServiceFeeCard = React.memo(({
   inputValue,
   onInputChange,
   onInputBlur,
-  onFeeTypeChange
+  onFeeTypeChange,
+  onSlabsChange
 }: { 
   service: ServiceFee
   serviceKey: keyof ShopFees
@@ -115,7 +192,25 @@ const ServiceFeeCard = React.memo(({
   onInputChange: (value: string) => void
   onInputBlur: () => void
   onFeeTypeChange: (isPercentage: boolean) => void
+  onSlabsChange: (useSlabs: boolean, slabs?: FeeSlab[]) => void
 }) => {
+  const [slabInput, setSlabInput] = React.useState<string>('')
+
+  // Initialize slab input when service slabs change
+  React.useEffect(() => {
+    if (service.slabs && service.slabs.length > 0) {
+      setSlabInput(formatSlabs(service.slabs))
+    }
+  }, [service.slabs])
+
+  // Auto-generate default slabs
+  const handleAutoGenerate = () => {
+    const defaultSlabs = generateDefaultSlabs(20000, 1000, 10)
+    const formattedSlabs = formatSlabs(defaultSlabs)
+    setSlabInput(formattedSlabs)
+    onSlabsChange(true, defaultSlabs)
+  }
+
   return (
     <Card className="bg-white dark:bg-gray-800 dark:border-gray-700">
       <CardHeader className="p-3 sm:p-4 lg:p-6">
@@ -128,49 +223,118 @@ const ServiceFeeCard = React.memo(({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-4 lg:p-6 pt-0">
-        {/* Fee Type Toggle */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
-          <Label className="text-xs sm:text-sm font-medium dark:text-gray-300 whitespace-nowrap flex-shrink-0">Fee Type:</Label>
-          <div className="flex gap-2 w-full sm:w-auto">
+        {/* Fee Structure Toggle */}
+        <div className="flex flex-col gap-3 p-3 sm:p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+          <Label className="text-xs sm:text-sm font-medium dark:text-gray-300">Fee Structure:</Label>
+          <div className="flex flex-col sm:flex-row gap-2">
             <Button
-              variant={service.isPercentage ? "default" : "outline"}
+              variant={!service.useSlabs && !service.isPercentage ? "default" : "outline"}
               size="sm"
-              onClick={() => onFeeTypeChange(true)}
-              className="dark:border-gray-600 flex-1 sm:flex-initial text-xs sm:text-sm h-9 sm:h-8 min-w-[100px]"
+              onClick={() => {
+                onFeeTypeChange(false)
+                onSlabsChange(false, [])
+              }}
+              className="dark:border-gray-600 text-xs sm:text-sm h-9 sm:h-8"
+            >
+              Simple (PKR)
+            </Button>
+            <Button
+              variant={!service.useSlabs && service.isPercentage ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                onFeeTypeChange(true)
+                onSlabsChange(false, [])
+              }}
+              className="dark:border-gray-600 text-xs sm:text-sm h-9 sm:h-8"
             >
               Percentage (%)
             </Button>
             <Button
-              variant={!service.isPercentage ? "default" : "outline"}
+              variant={service.useSlabs ? "default" : "outline"}
               size="sm"
-              onClick={() => onFeeTypeChange(false)}
-              className="dark:border-gray-600 flex-1 sm:flex-initial text-xs sm:text-sm h-9 sm:h-8 min-w-[100px]"
+              onClick={() => onSlabsChange(true, service.slabs || [])}
+              className="dark:border-gray-600 text-xs sm:text-sm h-9 sm:h-8"
             >
-              Fixed (PKR)
+              Tiered Slabs
             </Button>
           </div>
         </div>
 
-        {/* Fee Input */}
-        <div>
-          <Label htmlFor={`${serviceKey}-fee`} className="dark:text-gray-300 text-xs sm:text-sm">
-            Service Fee {service.isPercentage ? '(%)' : '(PKR)'}
-          </Label>
-          <Input
-            id={`${serviceKey}-fee`}
-            type="number"
-            step={service.isPercentage ? "0.1" : "1"}
-            min="0"
-            value={inputValue}
-            placeholder={service.isPercentage ? "Enter percentage (e.g., 1.5)" : "Enter fixed amount (e.g., 50)"}
-            onChange={(e) => onInputChange(e.target.value)}
-            onBlur={onInputBlur}
-            className="mt-1.5 dark:bg-gray-900 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500 text-sm sm:text-base h-9 sm:h-10"
-          />
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
-            {SERVICE_DESCRIPTIONS[serviceKey]}
-          </p>
-        </div>
+        {/* Simple/Percentage Fee Input */}
+        {!service.useSlabs && (
+          <div>
+            <Label htmlFor={`${serviceKey}-fee`} className="dark:text-gray-300 text-xs sm:text-sm">
+              Service Fee {service.isPercentage ? '(%)' : '(PKR per 1000)'}
+            </Label>
+            <Input
+              id={`${serviceKey}-fee`}
+              type="number"
+              step={service.isPercentage ? "0.1" : "1"}
+              min="0"
+              value={inputValue}
+              placeholder={service.isPercentage ? "e.g., 1.5" : "e.g., 10"}
+              onChange={(e) => onInputChange(e.target.value)}
+              onBlur={onInputBlur}
+              className="mt-1.5 dark:bg-gray-900 dark:border-gray-700 dark:text-white text-sm sm:text-base h-9 sm:h-10"
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+              {SERVICE_DESCRIPTIONS[serviceKey]}
+            </p>
+          </div>
+        )}
+
+        {/* Tiered Slabs Input */}
+        {service.useSlabs && (
+          <div className="space-y-3">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <Label className="dark:text-gray-300 text-xs sm:text-sm flex items-center gap-2">
+                  Fee Slabs (Ranges)
+                  <span className="text-xs text-gray-500 dark:text-gray-400 font-normal">Format: 0-1000:10, 1001-2000:20</span>
+                </Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAutoGenerate}
+                  className="h-7 px-2 text-xs dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                >
+                  ✨ Auto Generate
+                </Button>
+              </div>
+              <Input
+                type="text"
+                value={slabInput}
+                placeholder="e.g., 0-1000:10, 1001-2000:20, 2001-∞:30"
+                onChange={(e) => setSlabInput(e.target.value)}
+                onBlur={() => {
+                  const parsedSlabs = parseSlabs(slabInput)
+                  if (parsedSlabs.length > 0) {
+                    onSlabsChange(true, parsedSlabs)
+                  }
+                }}
+                className="mt-1.5 dark:bg-gray-900 dark:border-gray-700 dark:text-white text-sm h-9 sm:h-10 font-mono"
+              />
+            </div>
+            {/* Slabs Preview */}
+            {service.slabs && service.slabs.length > 0 && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <p className="text-xs font-medium text-blue-900 dark:text-blue-100 mb-2">Active Slabs:</p>
+                <div className="space-y-1">
+                  {service.slabs.map((slab, idx) => (
+                    <div key={idx} className="text-xs text-blue-800 dark:text-blue-200 flex justify-between">
+                      <span>₨{slab.minAmount.toLocaleString()} - ₨{slab.maxAmount === Infinity ? '∞' : slab.maxAmount.toLocaleString()}</span>
+                      <span className="font-semibold">→ ₨{slab.fee}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-blue-700 dark:text-blue-300 mt-2">
+                  💡 Example: ₨1,500 transaction = ₨{service.slabs.find(s => 1500 >= s.minAmount && 1500 <= s.maxAmount)?.fee || 0} fee
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   )
@@ -340,6 +504,17 @@ export default function FeesSettingsPage() {
     }))
   }, [])
 
+  const handleSlabsChange = React.useCallback((serviceKey: keyof ShopFees, useSlabs: boolean, slabs: FeeSlab[]) => {
+    setFees(prev => ({
+      ...prev,
+      [serviceKey]: {
+        ...prev[serviceKey],
+        useSlabs,
+        slabs
+      }
+    }))
+  }, [])
+
 
   return (
     <ProtectedRoute allowedRoles={[UserRole.SHOP_OWNER, UserRole.SUPER_ADMIN]}>
@@ -403,6 +578,7 @@ export default function FeesSettingsPage() {
                         onInputChange={(value) => handleInputChange('mobileLoad', value)}
                         onInputBlur={() => handleInputBlur('mobileLoad')}
                         onFeeTypeChange={(isPercentage) => handleFeeTypeChange('mobileLoad', isPercentage)}
+                        onSlabsChange={(useSlabs, slabs) => handleSlabsChange('mobileLoad', useSlabs, slabs)}
                       />
                     </div>
                   </div>
@@ -419,6 +595,7 @@ export default function FeesSettingsPage() {
                         onInputChange={(value) => handleInputChange('easypaisaSending', value)}
                         onInputBlur={() => handleInputBlur('easypaisaSending')}
                         onFeeTypeChange={(isPercentage) => handleFeeTypeChange('easypaisaSending', isPercentage)}
+                        onSlabsChange={(useSlabs, slabs) => handleSlabsChange('easypaisaSending', useSlabs, slabs)}
                       />
                       <ServiceFeeCard 
                         service={fees.easypaisaReceiving} 
@@ -429,6 +606,7 @@ export default function FeesSettingsPage() {
                         onInputChange={(value) => handleInputChange('easypaisaReceiving', value)}
                         onInputBlur={() => handleInputBlur('easypaisaReceiving')}
                         onFeeTypeChange={(isPercentage) => handleFeeTypeChange('easypaisaReceiving', isPercentage)}
+                        onSlabsChange={(useSlabs, slabs) => handleSlabsChange('easypaisaReceiving', useSlabs, slabs)}
                       />
                     </div>
                   </div>
@@ -445,6 +623,7 @@ export default function FeesSettingsPage() {
                         onInputChange={(value) => handleInputChange('jazzcashSending', value)}
                         onInputBlur={() => handleInputBlur('jazzcashSending')}
                         onFeeTypeChange={(isPercentage) => handleFeeTypeChange('jazzcashSending', isPercentage)}
+                        onSlabsChange={(useSlabs, slabs) => handleSlabsChange('jazzcashSending', useSlabs, slabs)}
                       />
                       <ServiceFeeCard 
                         service={fees.jazzcashReceiving} 
@@ -455,6 +634,7 @@ export default function FeesSettingsPage() {
                         onInputChange={(value) => handleInputChange('jazzcashReceiving', value)}
                         onInputBlur={() => handleInputBlur('jazzcashReceiving')}
                         onFeeTypeChange={(isPercentage) => handleFeeTypeChange('jazzcashReceiving', isPercentage)}
+                        onSlabsChange={(useSlabs, slabs) => handleSlabsChange('jazzcashReceiving', useSlabs, slabs)}
                       />
                     </div>
                   </div>
@@ -471,6 +651,7 @@ export default function FeesSettingsPage() {
                         onInputChange={(value) => handleInputChange('bankTransfer', value)}
                         onInputBlur={() => handleInputBlur('bankTransfer')}
                         onFeeTypeChange={(isPercentage) => handleFeeTypeChange('bankTransfer', isPercentage)}
+                        onSlabsChange={(useSlabs, slabs) => handleSlabsChange('bankTransfer', useSlabs, slabs)}
                       />
                       <ServiceFeeCard 
                         service={fees.billPayment} 
@@ -481,6 +662,7 @@ export default function FeesSettingsPage() {
                         onInputChange={(value) => handleInputChange('billPayment', value)}
                         onInputBlur={() => handleInputBlur('billPayment')}
                         onFeeTypeChange={(isPercentage) => handleFeeTypeChange('billPayment', isPercentage)}
+                        onSlabsChange={(useSlabs, slabs) => handleSlabsChange('billPayment', useSlabs, slabs)}
                       />
                     </div>
                   </div>

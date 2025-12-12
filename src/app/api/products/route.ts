@@ -81,11 +81,17 @@ export async function GET(request: NextRequest) {
     }
 
     if (category) {
-      where.categoryId = category
+      // Filter by category name
+      where.category = {
+        name: category
+      }
     }
 
     if (brand) {
-      where.brandId = brand
+      // Filter by brand name
+      where.brand = {
+        name: brand
+      }
     }
 
     if (type) {
