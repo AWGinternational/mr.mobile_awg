@@ -265,7 +265,7 @@ function MobileServicesPageContent() {
     // If using slab-based fees, find the appropriate slab
     if (commissionInfo.useSlabs && commissionInfo.slabs && commissionInfo.slabs.length > 0) {
       const matchingSlab = commissionInfo.slabs.find(
-        slab => numericAmount >= slab.minAmount && numericAmount <= slab.maxAmount
+        (slab: any) => numericAmount >= slab.minAmount && numericAmount <= slab.maxAmount
       );
       return matchingSlab ? matchingSlab.fee : 0;
     }
