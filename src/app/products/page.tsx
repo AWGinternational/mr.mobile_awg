@@ -295,7 +295,7 @@ function ProductManagementPage() {
           brandId: formData.brandId,
           costPrice: costPrice,
           sellingPrice: sellingPrice,
-          lowStockThreshold: parseInt(formData.lowStockThreshold) || 5,
+          lowStockThreshold: formData.lowStockThreshold ? parseInt(formData.lowStockThreshold) : 1,
           initialStock: parseInt(formData.stock) || 0
         })
       })
@@ -1349,8 +1349,8 @@ function ProductManagementPage() {
                     <Input type="number" value={formData.stock} onChange={(e) => setFormData({...formData, stock: e.target.value})} placeholder="10" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Low Stock Threshold *</Label>
-                    <Input type="number" value={formData.lowStockThreshold} onChange={(e) => setFormData({...formData, lowStockThreshold: e.target.value})} placeholder="3" />
+                    <Label>Low Stock Threshold <span className="text-xs text-gray-500">(Optional, default: 1)</span></Label>
+                    <Input type="number" value={formData.lowStockThreshold} onChange={(e) => setFormData({...formData, lowStockThreshold: e.target.value})} placeholder="1" />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -1397,8 +1397,8 @@ function ProductManagementPage() {
                     <Input type="number" value={formData.sellingPrice} onChange={(e) => setFormData({...formData, sellingPrice: e.target.value})} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Low Stock Threshold *</Label>
-                    <Input type="number" value={formData.lowStockThreshold} onChange={(e) => setFormData({...formData, lowStockThreshold: e.target.value})} />
+                    <Label>Low Stock Threshold <span className="text-xs text-gray-500">(Optional, default: 1)</span></Label>
+                    <Input type="number" value={formData.lowStockThreshold} onChange={(e) => setFormData({...formData, lowStockThreshold: e.target.value})} placeholder="1" />
                   </div>
                   <div className="space-y-2">
                     <Label>Current Stock</Label>

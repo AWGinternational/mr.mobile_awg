@@ -18,7 +18,7 @@ import { TopNavigation } from '@/components/layout/TopNavigation'
 import { SuccessDialog } from '@/components/ui/success-dialog'
 import { ErrorDialog } from '@/components/ui/error-dialog'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Loader2 } from 'lucide-react'
+import { Loader2, CheckCircle } from 'lucide-react'
 import { 
   ShoppingCart,
   Plus,
@@ -88,6 +88,10 @@ function POSSystem() {
   
   // NEW: Display limit for products (performance optimization)
   const [displayLimit, setDisplayLimit] = useState(20) // Show only 20 products initially
+  
+  // Loading states for cart operations
+  const [addingToCart, setAddingToCart] = useState<string | null>(null) // Track which product is being added
+  const [addedProducts, setAddedProducts] = useState<Set<string>>(new Set()) // Track recently added products for feedback
 
   // Debounce search term to avoid too many API calls
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm)
@@ -387,7 +391,14 @@ function POSSystem() {
   }
 
   const addToCart = async (product: any, quantity: number = 1) => {
+    // Prevent duplicate additions - check if already adding this product
+    if (addingToCart === product.id) {
+      return
+    }
+
     try {
+      setAddingToCart(product.id)
+      
       // Use quick quantity if set
       const actualQuantity = quickQuantity || quantity
       
@@ -403,6 +414,17 @@ function POSSystem() {
 
       if (response.ok) {
         await loadCart()
+        
+        // Show visual feedback for added product
+        setAddedProducts(prev => new Set([...prev, product.id]))
+        setTimeout(() => {
+          setAddedProducts(prev => {
+            const newSet = new Set(prev)
+            newSet.delete(product.id)
+            return newSet
+          })
+        }, 1500) // Remove feedback after 1.5 seconds
+        
         // Add to recent products list
         if (!recentProducts.find(p => p.id === product.id)) {
           setRecentProducts([product, ...recentProducts.slice(0, 4)])
@@ -436,6 +458,8 @@ function POSSystem() {
       }
     } catch (error) {
       console.error('Error adding to cart:', error)
+    } finally {
+      setAddingToCart(null)
     }
   }
 
@@ -947,11 +971,19 @@ function POSSystem() {
                         <Badge className="bg-orange-500 text-white">Quick Add</Badge>
                       </div>
                       <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-hide">
-                        {recentProducts.map((product) => (
+                        {recentProducts.map((product) => {
+                          const isAdding = addingToCart === product.id
+                          const wasAdded = addedProducts.has(product.id)
+                          
+                          return (
                           <Card 
                             key={product.id}
-                            className="min-w-[220px] flex-shrink-0 border-2 border-gray-200 hover:border-orange-400 hover:shadow-xl transition-all duration-200 cursor-pointer group"
-                            onClick={() => addToCart(product)}
+                            className={`min-w-[220px] flex-shrink-0 border-2 transition-all duration-200 cursor-pointer group ${
+                              wasAdded 
+                                ? 'border-green-400 bg-green-50 dark:bg-green-900/20 shadow-lg' 
+                                : 'border-gray-200 hover:border-orange-400 hover:shadow-xl'
+                            }`}
+                            onClick={() => !isAdding && addToCart(product)}
                           >
                             <CardContent className="p-4">
                               <div className="mb-3">
@@ -972,14 +1004,25 @@ function POSSystem() {
                               </div>
                               <Button 
                                 size="sm" 
-                                className="w-full h-8 bg-orange-500 hover:bg-orange-600 text-white font-semibold shadow-md group-hover:shadow-lg transition-all"
+                                disabled={isAdding}
+                                className={`w-full h-8 font-semibold shadow-md transition-all ${
+                                  wasAdded
+                                    ? 'bg-green-500 hover:bg-green-600 text-white'
+                                    : 'bg-orange-500 hover:bg-orange-600 text-white group-hover:shadow-lg'
+                                }`}
                               >
-                                <Plus className="h-4 w-4 mr-1" />
-                                Quick Add
+                                {isAdding ? (
+                                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Adding...</>
+                                ) : wasAdded ? (
+                                  <><CheckCircle className="h-4 w-4 mr-1" /> Added!</>
+                                ) : (
+                                  <><Plus className="h-4 w-4 mr-1" /> Quick Add</>
+                                )}
                               </Button>
                             </CardContent>
                           </Card>
-                        ))}
+                        )}
+                        )}
                       </div>
                       <div className="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent mt-4 mb-4"></div>
                     </div>
@@ -993,29 +1036,43 @@ function POSSystem() {
                   ) : (
                     <>
                       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 max-h-[600px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-                        {displayedProducts.map((product, index) => (
+                        {displayedProducts.map((product, index) => {
+                          const isAdding = addingToCart === product.id
+                          const wasAdded = addedProducts.has(product.id)
+                          const isOutOfStock = (product.stock || product.stockQuantity || 0) === 0
+                          
+                          return (
                           <Card 
                             key={product.id} 
                             id={`product-${index}`}
                             className={`group relative overflow-hidden transition-all duration-200 cursor-pointer border-2
-                              ${index === selectedProductIndex && isSearchFocused
-                                ? 'ring-4 ring-blue-400 ring-offset-2 shadow-xl scale-[1.02] border-blue-500'
-                                : 'border-gray-200 hover:border-blue-300 hover:shadow-lg'
+                              ${
+                                wasAdded
+                                  ? 'border-green-400 bg-green-50 dark:bg-green-900/20 shadow-xl scale-[1.02]'
+                                  : index === selectedProductIndex && isSearchFocused
+                                  ? 'ring-4 ring-blue-400 ring-offset-2 shadow-xl scale-[1.02] border-blue-500'
+                                  : 'border-gray-200 hover:border-blue-300 hover:shadow-lg'
                               }`}
                             onClick={() => {
-                              if ((product.stock || product.stockQuantity || 0) > 0) {
+                              if (!isOutOfStock && !isAdding) {
                                 addToCart(product)
                               }
                             }}
                           >
-                            {/* Selected Indicator Badge */}
-                            {index === selectedProductIndex && isSearchFocused && (
+                            {/* Selected/Success Indicator Badge */}
+                            {wasAdded ? (
+                              <div className="absolute top-2 right-2 z-10">
+                                <Badge className="bg-green-500 text-white flex items-center gap-1 animate-bounce">
+                                  <CheckCircle className="h-3 w-3" /> Added to Cart!
+                                </Badge>
+                              </div>
+                            ) : index === selectedProductIndex && isSearchFocused ? (
                               <div className="absolute top-2 right-2 z-10">
                                 <Badge className="bg-blue-500 text-white animate-pulse">
                                   ⌨️ Selected
                                 </Badge>
                               </div>
-                            )}
+                            ) : null}
                             
                             {/* Stock Badge - Top Left */}
                             {(product.stock !== undefined || product.stockQuantity !== undefined) && (
@@ -1068,32 +1125,48 @@ function POSSystem() {
                               <Button 
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  addToCart(product)
+                                  if (!isOutOfStock && !isAdding) {
+                                    addToCart(product)
+                                  }
                                 }}
-                                disabled={
-                                  (product.stock || product.stockQuantity || 0) === 0 ||
-                                  loading
-                                }
+                                disabled={isOutOfStock || isAdding}
                                 className={`w-full font-semibold transition-all duration-200 ${
-                                  (product.stock || product.stockQuantity || 0) > 0
-                                    ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg'
-                                    : 'bg-gray-300 cursor-not-allowed'
+                                  wasAdded
+                                    ? 'bg-green-600 hover:bg-green-700 text-white shadow-lg'
+                                    : isOutOfStock
+                                    ? 'bg-gray-300 cursor-not-allowed'
+                                    : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg'
                                 }`}
                                 size="lg"
                               >
-                                <Plus className="h-5 w-5 mr-2" />
-                                {index === selectedProductIndex && isSearchFocused 
-                                  ? '⏎ Press Enter to Add' 
-                                  : (product.stock || product.stockQuantity || 0) === 0
-                                    ? 'Out of Stock'
-                                    : 'Add to Cart'}
+                                {isAdding ? (
+                                  <>
+                                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                                    Adding...
+                                  </>
+                                ) : wasAdded ? (
+                                  <>
+                                    <CheckCircle className="h-5 w-5 mr-2" />
+                                    Added to Cart!
+                                  </>
+                                ) : (
+                                  <>
+                                    <Plus className="h-5 w-5 mr-2" />
+                                    {index === selectedProductIndex && isSearchFocused 
+                                      ? '⏎ Press Enter to Add' 
+                                      : isOutOfStock
+                                        ? 'Out of Stock'
+                                        : 'Add to Cart'}
+                                  </>
+                                )}
                               </Button>
                             </CardContent>
 
                             {/* Hover Effect Border */}
                             <div className="absolute inset-0 border-2 border-transparent group-hover:border-blue-400 rounded-lg transition-all pointer-events-none"></div>
                           </Card>
-                        ))}
+                        )}
+                        )}
                       </div>
                       
                       {/* Load More Button - Only show if there are more products */}

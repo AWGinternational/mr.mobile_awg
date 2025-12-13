@@ -15,8 +15,8 @@ const createProductSchema = z.object({
   sellingPrice: z.number().positive('Selling price must be positive'),
   categoryId: z.string().min(1, 'Category is required'),
   brandId: z.string().min(1, 'Brand is required'),
-  lowStockThreshold: z.number().int().min(0).default(5),
-  reorderPoint: z.number().int().min(0).default(10),
+  lowStockThreshold: z.number().int().min(0).default(1).optional(),
+  reorderPoint: z.number().int().min(0).default(10).optional(),
   warranty: z.number().int().min(0).optional(),
   minimumPrice: z.number().positive().optional(),
   initialStock: z.number().int().min(0).default(0).optional()
