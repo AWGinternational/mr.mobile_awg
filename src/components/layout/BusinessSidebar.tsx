@@ -31,7 +31,8 @@ import {
   Plus,
   ClipboardCheck,
   Clock,
-  MessageSquare // 💬 MESSAGES ICON
+  MessageSquare, // 💬 MESSAGES ICON
+  HelpCircle // ❓ HELP ICON
 } from 'lucide-react'
 
 // Custom EasyPaisa Icon Component
@@ -277,6 +278,16 @@ export function BusinessSidebar({ isOpen = false, onClose }: SidebarProps) {
       systemModule: 'MESSAGES' // Communication system, visible to all shop users
     },
     
+    // 13.5. Help Center - Tutorials and Support (All users)
+    { 
+      name: 'Help Center', 
+      icon: HelpCircle, 
+      path: '/help', 
+      color: 'text-blue-600', 
+      bgColor: 'bg-blue-50',
+      systemModule: 'HELP_CENTER' // Always visible, no permission needed
+    },
+    
     // 14. Team Management - Worker management (Owner only)
     { 
       name: 'Team', 
@@ -321,10 +332,11 @@ export function BusinessSidebar({ isOpen = false, onClose }: SidebarProps) {
         subModules: module.subModules ? [...module.subModules] : undefined
       }))
       .filter(module => {
-        // Dashboard, My Requests, and Messages are always visible to workers
+        // Dashboard, My Requests, Messages, and Help Center are always visible to workers
         if (module.name === 'Dashboard') return true
         if (module.systemModule === 'MY_REQUESTS') return true
         if (module.systemModule === 'MESSAGES') return true // 💬 MESSAGES ALWAYS VISIBLE
+        if (module.systemModule === 'HELP_CENTER') return true // ❓ HELP CENTER ALWAYS VISIBLE
         
         // Team Management and Shop Settings - never visible to workers
         if (module.systemModule === 'TEAM_MANAGEMENT') return false
