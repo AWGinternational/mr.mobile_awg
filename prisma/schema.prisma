@@ -259,7 +259,7 @@ model CartItem {
   quantity    Int
   addedAt     DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  customPrice Decimal? @db.Decimal(10, 2)
+  // customPrice Decimal? @db.Decimal(10, 2) // Temporarily disabled - uncomment when database has this column
   product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
