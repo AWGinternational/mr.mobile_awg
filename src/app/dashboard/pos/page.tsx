@@ -690,7 +690,8 @@ function POSSystem() {
 
       if (checkoutResponse.ok) {
         const responseData = await checkoutResponse.json()
-        setLastSaleId(responseData.sale.id)
+        const saleId = responseData.sale.id
+        setLastSaleId(saleId)
         
         // Set sale details for success dialog
         setSaleDetails({
@@ -714,6 +715,10 @@ function POSSystem() {
         // Refresh products to update stock levels
         // Invalidate products query to refetch
         queryClient.invalidateQueries({ queryKey: ['products', 'pos'] })
+        
+        // Auto-generate receipt in background while showing success dialog
+        // This eliminates the wait time when user clicks "Generate Receipt"
+        generateReceipt(saleId)
         
         // Show success dialog
         setShowSuccessDialog(true)
@@ -741,7 +746,7 @@ function POSSystem() {
   const generateReceipt = async (saleId: string) => {
     try {
       setLoadingReceipt(true)
-      setShowReceiptDialog(true)
+      // Don't show dialog until receipt is loaded
       
       // Fetch receipt HTML
       const response = await fetch(`/api/pos/receipt/${saleId}`)
@@ -780,6 +785,8 @@ function POSSystem() {
         </div>
       `
       setReceiptHtml(styledHtml)
+      // Receipt is ready, but don't auto-show the dialog
+      // User will click "Generate Receipt" button to view it
     } catch (error) {
       console.error('Error generating receipt:', error)
       setShowReceiptDialog(false)
@@ -2012,6 +2019,19 @@ function POSSystem() {
           </div>
         )}
 
+        {/* Loading Overlay during Checkout */}
+        {loading && (
+          <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-2xl flex flex-col items-center space-y-4 max-w-sm mx-4">
+              <Loader2 className="h-16 w-16 animate-spin text-green-600" />
+              <div className="text-center">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Processing Sale...</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Please wait while we process your transaction</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Success Dialog */}
         <SuccessDialog
           open={showSuccessDialog}
@@ -2021,10 +2041,9 @@ function POSSystem() {
           details={saleDetails}
           showReceiptOption={true}
           onGenerateReceipt={() => {
-            if (lastSaleId) {
-              generateReceipt(lastSaleId)
-              setShowSuccessDialog(false)
-            }
+            // Receipt is already generated, just show the dialog
+            setShowSuccessDialog(false)
+            setShowReceiptDialog(true)
           }}
         />
 
