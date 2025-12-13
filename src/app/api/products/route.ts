@@ -211,6 +211,21 @@ export async function POST(request: NextRequest) {
     
     const validatedData = createProductSchema.parse(body)
 
+    // Check for duplicate product (same name + model in the same shop)
+    const duplicateProduct = await prisma.product.findFirst({
+      where: {
+        shopId: currentShopId,
+        name: validatedData.name,
+        model: validatedData.model
+      }
+    })
+
+    if (duplicateProduct) {
+      return NextResponse.json({ 
+        error: `Product "${validatedData.name} ${validatedData.model}" already exists in your shop` 
+      }, { status: 409 }) // 409 Conflict
+    }
+
     // Fetch category and brand to generate SKU
     const [category, brand] = await Promise.all([
       prisma.category.findFirst({

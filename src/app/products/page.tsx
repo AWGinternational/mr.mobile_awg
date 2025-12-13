@@ -132,6 +132,8 @@ function ProductManagementPage() {
   const [brandToDelete, setBrandToDelete] = useState<Brand | null>(null)
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -254,6 +256,11 @@ function ProductManagementPage() {
   }
 
   const handleCreate = async () => {
+    // Prevent duplicate submissions
+    if (isCreating) {
+      return
+    }
+
     try {
       // Validate required fields
       if (!formData.name || !formData.model || !formData.categoryId || !formData.brandId) {
@@ -273,6 +280,8 @@ function ProductManagementPage() {
         showError('Please enter a valid selling price')
         return
       }
+
+      setIsCreating(true)
 
       const response = await fetch('/api/products', {
         method: 'POST',
@@ -305,6 +314,8 @@ function ProductManagementPage() {
     } catch (error) {
       console.error('Create product error:', error)
       showError(error instanceof Error ? error.message : 'Failed to create product')
+    } finally {
+      setIsCreating(false)
     }
   }
 
@@ -341,8 +352,15 @@ function ProductManagementPage() {
 
   const handleUpdate = async () => {
     if (!selectedProduct) return
+    
+    // Prevent duplicate submissions
+    if (isUpdating) {
+      return
+    }
 
     try {
+      setIsUpdating(true)
+
       const response = await fetch(`/api/products/${selectedProduct.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -373,6 +391,8 @@ function ProductManagementPage() {
       }
     } catch (error) {
       showError(error instanceof Error ? error.message : 'Failed to update product')
+    } finally {
+      setIsUpdating(false)
     }
   }
 
@@ -1339,8 +1359,10 @@ function ProductManagementPage() {
                 </div>
               </div>
               <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex gap-3">
-                <Button variant="outline" onClick={() => setShowCreateDialog(false)} className="flex-1">Cancel</Button>
-                <Button onClick={handleCreate} className="flex-1 bg-blue-600 hover:bg-blue-700">Create Product</Button>
+                <Button variant="outline" onClick={() => setShowCreateDialog(false)} className="flex-1" disabled={isCreating}>Cancel</Button>
+                <Button onClick={handleCreate} className="flex-1 bg-blue-600 hover:bg-blue-700" disabled={isCreating}>
+                  {isCreating ? 'Creating...' : 'Create Product'}
+                </Button>
               </div>
             </div>
           </div>
@@ -1398,8 +1420,10 @@ function ProductManagementPage() {
                 </div>
               </div>
               <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex gap-3">
-                <Button variant="outline" onClick={() => {setShowEditDialog(false); setSelectedProduct(null); resetForm()}} className="flex-1">Cancel</Button>
-                <Button onClick={handleUpdate} className="flex-1 bg-blue-600 hover:bg-blue-700">Update Product</Button>
+                <Button variant="outline" onClick={() => {setShowEditDialog(false); setSelectedProduct(null); resetForm()}} className="flex-1" disabled={isUpdating}>Cancel</Button>
+                <Button onClick={handleUpdate} className="flex-1 bg-blue-600 hover:bg-blue-700" disabled={isUpdating}>
+                  {isUpdating ? 'Updating...' : 'Update Product'}
+                </Button>
               </div>
             </div>
           </div>
