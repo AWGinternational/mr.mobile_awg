@@ -92,6 +92,9 @@ function POSSystem() {
   // Loading states for cart operations
   const [addingToCart, setAddingToCart] = useState<string | null>(null) // Track which product is being added
   const [addedProducts, setAddedProducts] = useState<Set<string>>(new Set()) // Track recently added products for feedback
+  const [editingPrice, setEditingPrice] = useState<string | null>(null) // Track which item's price is being edited
+  const [tempPrice, setTempPrice] = useState<string>('') // Temporary price during edit
+  const [showMobileCart, setShowMobileCart] = useState(false) // Toggle mobile cart drawer
 
   // Debounce search term to avoid too many API calls
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm)
@@ -510,6 +513,36 @@ function POSSystem() {
     }
   }
 
+  const updatePrice = async (productId: string, newPrice: number) => {
+    try {
+      const response = await fetch('/api/pos/cart', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId,
+          unitPrice: newPrice
+        })
+      })
+
+      if (response.ok) {
+        await loadCart()
+      } else {
+        // Fallback to local state
+        setCart(cart.map(item =>
+          item.productId === productId
+            ? { 
+                ...item, 
+                unitPrice: newPrice,
+                totalPrice: newPrice * item.quantity
+              }
+            : item
+        ))
+      }
+    } catch (error) {
+      console.error('Error updating price:', error)
+    }
+  }
+
   const removeFromCart = async (productId: string) => {
     try {
       const response = await fetch('/api/pos/cart', {
@@ -880,15 +913,15 @@ function POSSystem() {
             </div>
 
             {/* Main POS Interface */}
-            <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div className="px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 md:py-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
             
             {/* Product Search & Selection */}
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 pb-20 lg:pb-0">
               <Card>
-                <CardHeader className="p-4 sm:p-6">
-                  <CardTitle className="flex items-center text-base sm:text-lg">
-                    <Package className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                <CardHeader className="p-3 sm:p-4 md:p-6">
+                  <CardTitle className="flex items-center text-sm sm:text-base md:text-lg">
+                    <Package className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2" />
                     Product Selection
                   </CardTitle>
                   
@@ -960,9 +993,9 @@ function POSSystem() {
                   )}
                 </CardHeader>
                 <CardContent>
-                  {/* Recent Products Section */}
+                  {/* Recent Products Section - Hidden on mobile */}
                   {recentProducts.length > 0 && !searchTerm && (
-                    <div className="mb-6">
+                    <div className="hidden sm:block mb-6">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <span className="text-2xl">🔥</span>
@@ -970,7 +1003,7 @@ function POSSystem() {
                         </div>
                         <Badge className="bg-orange-500 text-white">Quick Add</Badge>
                       </div>
-                      <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-hide">
+                      <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-3 scrollbar-hide">
                         {recentProducts.map((product) => {
                           const isAdding = addingToCart === product.id
                           const wasAdded = addedProducts.has(product.id)
@@ -978,45 +1011,45 @@ function POSSystem() {
                           return (
                           <Card 
                             key={product.id}
-                            className={`min-w-[220px] flex-shrink-0 border-2 transition-all duration-200 cursor-pointer group ${
+                            className={`min-w-[160px] sm:min-w-[200px] md:min-w-[220px] flex-shrink-0 border-2 transition-all duration-200 cursor-pointer group ${
                               wasAdded 
                                 ? 'border-green-400 bg-green-50 dark:bg-green-900/20 shadow-lg' 
                                 : 'border-gray-200 hover:border-orange-400 hover:shadow-xl'
                             }`}
                             onClick={() => !isAdding && addToCart(product)}
                           >
-                            <CardContent className="p-4">
-                              <div className="mb-3">
-                                <h4 className="font-bold text-sm text-gray-900 dark:text-white truncate group-hover:text-orange-600 transition-colors">
+                            <CardContent className="p-2.5 sm:p-3 md:p-4">
+                              <div className="mb-2 sm:mb-3">
+                                <h4 className="font-bold text-xs sm:text-sm text-gray-900 dark:text-white truncate group-hover:text-orange-600 transition-colors">
                                   {product.name}
                                 </h4>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 truncate font-mono mt-0.5">
+                                <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 truncate font-mono mt-0.5">
                                   {product.sku}
                                 </p>
                                 {product.brand && (
-                                  <span className="inline-block text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded mt-1">
+                                  <span className="inline-block text-[10px] sm:text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-1.5 sm:px-2 py-0.5 rounded mt-1">
                                     {typeof product.brand === 'string' ? product.brand : product.brand.name}
                                   </span>
                                 )}
                               </div>
-                              <div className="text-lg font-extrabold text-green-600 mb-3">
+                              <div className="text-sm sm:text-base md:text-lg font-extrabold text-green-600 mb-2 sm:mb-3">
                                 PKR {(product.sellingPrice || product.price || 0).toLocaleString()}
                               </div>
                               <Button 
                                 size="sm" 
                                 disabled={isAdding}
-                                className={`w-full h-8 font-semibold shadow-md transition-all ${
+                                className={`w-full h-7 sm:h-8 text-xs font-semibold shadow-md transition-all ${
                                   wasAdded
                                     ? 'bg-green-500 hover:bg-green-600 text-white'
                                     : 'bg-orange-500 hover:bg-orange-600 text-white group-hover:shadow-lg'
                                 }`}
                               >
                                 {isAdding ? (
-                                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Adding...</>
+                                  <><Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 animate-spin" /> <span className="hidden sm:inline">Adding...</span><span className="sm:hidden">Add</span></>
                                 ) : wasAdded ? (
-                                  <><CheckCircle className="h-4 w-4 mr-1" /> Added!</>
+                                  <><CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> <span className="hidden sm:inline">Added!</span><span className="sm:hidden">✓</span></>
                                 ) : (
-                                  <><Plus className="h-4 w-4 mr-1" /> Quick Add</>
+                                  <><Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> <span className="hidden sm:inline">Quick Add</span><span className="sm:hidden">Add</span></>
                                 )}
                               </Button>
                             </CardContent>
@@ -1035,7 +1068,7 @@ function POSSystem() {
                     </div>
                   ) : (
                     <>
-                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 max-h-[600px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 md:gap-5 max-h-[500px] sm:max-h-[600px] overflow-y-auto pr-1 sm:pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                         {displayedProducts.map((product, index) => {
                           const isAdding = addingToCart === product.id
                           const wasAdded = addedProducts.has(product.id)
@@ -1088,40 +1121,29 @@ function POSSystem() {
                               </div>
                             )}
 
-                            <CardContent className="p-5 pt-10">
+                            <CardContent className="p-2 sm:p-4 md:p-5 pt-7 sm:pt-10">
                               {/* Product Name */}
-                              <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                              <h3 className="font-bold text-xs sm:text-base md:text-lg text-gray-900 dark:text-white mb-0.5 sm:mb-1 line-clamp-1 sm:line-clamp-2 group-hover:text-blue-600 transition-colors">
                                 {product.name}
                               </h3>
                               
                               {/* Brand & SKU */}
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="text-xs font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
+                              <div className="flex items-center gap-1 sm:gap-2 mb-1 sm:mb-2 overflow-hidden">
+                                <span className="text-[9px] sm:text-xs font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 px-1 sm:px-2 py-0.5 rounded truncate">
                                   {typeof product.brand === 'string' ? product.brand : (product.brand?.name || 'N/A')}
-                                </span>
-                                <span className="text-xs text-gray-400">•</span>
-                                <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">
-                                  {product.sku}
                                 </span>
                               </div>
 
-                              {/* Model */}
-                              {product.model && (
-                                <p className="text-xs text-gray-400 dark:text-gray-500 mb-3 italic">
-                                  Model: {product.model}
-                                </p>
-                              )}
-
-                              {/* Price - Large & Bold */}
-                              <div className="mt-3 mb-4">
-                                <div className="flex items-baseline gap-2">
-                                  <span className="text-2xl font-extrabold text-green-600">
+                              {/* Price - Responsive sizing */}
+                              <div className="mt-1 sm:mt-3 mb-1.5 sm:mb-3 md:mb-4">
+                                <div className="flex items-baseline gap-1 sm:gap-2">
+                                  <span className="text-base sm:text-xl md:text-2xl font-extrabold text-green-600">
                                     PKR {(product.sellingPrice || product.price || 0).toLocaleString()}
                                   </span>
                                 </div>
                               </div>
 
-                              {/* Add to Cart Button */}
+                              {/* Add to Cart Button - Compact on mobile */}
                               <Button 
                                 onClick={(e) => {
                                   e.stopPropagation()
@@ -1130,33 +1152,39 @@ function POSSystem() {
                                   }
                                 }}
                                 disabled={isOutOfStock || isAdding}
-                                className={`w-full font-semibold transition-all duration-200 ${
+                                className={`w-full font-semibold transition-all duration-200 h-7 sm:h-9 md:h-10 text-[10px] sm:text-sm ${
                                   wasAdded
                                     ? 'bg-green-600 hover:bg-green-700 text-white shadow-lg'
                                     : isOutOfStock
                                     ? 'bg-gray-300 cursor-not-allowed'
                                     : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg'
                                 }`}
-                                size="lg"
                               >
                                 {isAdding ? (
                                   <>
-                                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                                    Adding...
+                                    <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5 mr-1 sm:mr-2 animate-spin" />
+                                    <span className="hidden sm:inline">Adding...</span>
+                                    <span className="sm:hidden">Adding</span>
                                   </>
                                 ) : wasAdded ? (
                                   <>
-                                    <CheckCircle className="h-5 w-5 mr-2" />
-                                    Added to Cart!
+                                    <CheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5 mr-1 sm:mr-2" />
+                                    <span className="hidden sm:inline">Added to Cart!</span>
+                                    <span className="sm:hidden">Added!</span>
                                   </>
                                 ) : (
                                   <>
-                                    <Plus className="h-5 w-5 mr-2" />
-                                    {index === selectedProductIndex && isSearchFocused 
-                                      ? '⏎ Press Enter to Add' 
-                                      : isOutOfStock
-                                        ? 'Out of Stock'
-                                        : 'Add to Cart'}
+                                    <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5 mr-1 sm:mr-2" />
+                                    <span className="hidden sm:inline">
+                                      {index === selectedProductIndex && isSearchFocused 
+                                        ? '⏎ Press Enter to Add' 
+                                        : isOutOfStock
+                                          ? 'Out of Stock'
+                                          : 'Add to Cart'}
+                                    </span>
+                                    <span className="sm:hidden">
+                                      {isOutOfStock ? 'Out' : 'Add'}
+                                    </span>
                                   </>
                                 )}
                               </Button>
@@ -1221,8 +1249,20 @@ function POSSystem() {
               </Card>
             </div>
 
-            {/* Shopping Cart & Checkout */}
-            <div className="lg:col-span-1">
+            {/* Floating Cart Button - Mobile Only */}
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 p-3 bg-white dark:bg-gray-800 border-t-2 border-green-500 shadow-2xl">
+              <Button
+                onClick={() => setShowMobileCart(true)}
+                className="w-full h-14 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold text-base shadow-lg rounded-xl"
+                disabled={cart.length === 0}
+              >
+                <ShoppingCart className="h-5 w-5 mr-2" />
+                Cart ({cart.length}) - PKR {calculateGrandTotal().toLocaleString()}
+              </Button>
+            </div>
+
+            {/* Shopping Cart & Checkout - Hidden on Mobile */}
+            <div className="hidden lg:block lg:col-span-1">
               <Card className="sticky top-6">
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
@@ -1307,9 +1347,75 @@ function POSSystem() {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{item.productName}</p>
                             <p className="text-xs text-gray-500 dark:text-gray-400">{item.productSku}</p>
-                            <p className="text-sm font-semibold text-green-600">
-                              PKR {Number(item.unitPrice || 0).toLocaleString()}
-                            </p>
+                            {editingPrice === item.productId ? (
+                              <div className="flex items-center gap-1 mt-1">
+                                <Input
+                                  type="number"
+                                  value={tempPrice}
+                                  onChange={(e) => setTempPrice(e.target.value)}
+                                  className="h-6 w-24 text-xs px-1"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      const newPrice = parseFloat(tempPrice)
+                                      if (newPrice > 0) {
+                                        updatePrice(item.productId, newPrice)
+                                        setEditingPrice(null)
+                                      }
+                                    } else if (e.key === 'Escape') {
+                                      setEditingPrice(null)
+                                    }
+                                  }}
+                                />
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    const newPrice = parseFloat(tempPrice)
+                                    if (newPrice > 0) {
+                                      updatePrice(item.productId, newPrice)
+                                      setEditingPrice(null)
+                                    }
+                                  }}
+                                  className="h-6 px-2 text-xs bg-green-600 hover:bg-green-700"
+                                >
+                                  ✓
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setEditingPrice(null)}
+                                  className="h-6 px-2 text-xs"
+                                >
+                                  ✕
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-semibold text-green-600">
+                                  PKR {Number(item.unitPrice || 0).toLocaleString()}
+                                </p>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setEditingPrice(item.productId)
+                                    setTempPrice(String(item.unitPrice))
+                                  }}
+                                  className="h-5 w-5 p-0 hover:bg-green-50 dark:hover:bg-green-900/20"
+                                  title="Edit price"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                  </svg>
+                                </Button>
+                                {item.isCustomPrice && (
+                                  <span className="text-xs text-orange-600 dark:text-orange-400 font-medium" title={`Original: PKR ${Number(item.originalPrice || 0).toLocaleString()}`}>
+                                    (Custom)
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center space-x-1 ml-2">
                             <Button
@@ -1637,6 +1743,248 @@ function POSSystem() {
                 </div>
               </CardContent>
             </Card>
+          </div>
+        )}
+
+        {/* Mobile Cart Modal/Drawer */}
+        {showMobileCart && (
+          <div className="lg:hidden fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm" onClick={() => setShowMobileCart(false)}>
+            <div 
+              className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-900 rounded-t-3xl max-h-[85vh] overflow-hidden shadow-2xl animate-slide-up"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="sticky top-0 bg-gradient-to-r from-green-600 to-green-700 text-white p-4 flex items-center justify-between rounded-t-3xl z-10">
+                <div className="flex items-center gap-2">
+                  <ShoppingCart className="h-6 w-6" />
+                  <div>
+                    <h3 className="text-lg font-bold">Shopping Cart</h3>
+                    <p className="text-xs text-green-100">{cart.length} items</p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowMobileCart(false)}
+                  className="h-10 w-10 p-0 rounded-full bg-white/10 hover:bg-white/20 text-white"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+
+              {/* Scrollable Content */}
+              <div className="overflow-y-auto max-h-[calc(85vh-200px)] p-4 space-y-4">
+                {/* Customer Info */}
+                <div>
+                  <Label className="text-xs font-semibold mb-2 flex items-center text-gray-700 dark:text-gray-300">
+                    <User className="h-3.5 w-3.5 mr-1" />
+                    Customer (Optional)
+                  </Label>
+                  <div className="space-y-2">
+                    <Input
+                      placeholder="Name"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className="h-10 text-sm"
+                    />
+                    <Input
+                      placeholder="Phone"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="h-10 text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Cart Items */}
+                <div className="space-y-2">
+                  {cart.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <ShoppingCart className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">Cart is empty</p>
+                    </div>
+                  ) : (
+                    cart.map((item) => (
+                      <div key={item.productId} className="bg-gray-50 dark:bg-gray-800 p-3 rounded-xl border border-gray-200 dark:border-gray-700">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1 min-w-0 mr-2">
+                            <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{item.productName}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{item.productSku}</p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => removeFromCart(item.productId)}
+                            className="h-7 w-7 p-0 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {editingPrice === item.productId ? (
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  type="number"
+                                  value={tempPrice}
+                                  onChange={(e) => setTempPrice(e.target.value)}
+                                  className="h-7 w-24 text-xs px-2"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      const newPrice = parseFloat(tempPrice)
+                                      if (newPrice > 0) {
+                                        updatePrice(item.productId, newPrice)
+                                        setEditingPrice(null)
+                                      }
+                                    } else if (e.key === 'Escape') {
+                                      setEditingPrice(null)
+                                    }
+                                  }}
+                                />
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    const newPrice = parseFloat(tempPrice)
+                                    if (newPrice > 0) {
+                                      updatePrice(item.productId, newPrice)
+                                      setEditingPrice(null)
+                                    }
+                                  }}
+                                  className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700"
+                                >
+                                  ✓
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setEditingPrice(null)}
+                                  className="h-7 px-2 text-xs"
+                                >
+                                  ✕
+                                </Button>
+                              </div>
+                            ) : (
+                              <>
+                                <p className="text-sm font-bold text-green-600">
+                                  PKR {Number(item.unitPrice || 0).toLocaleString()}
+                                </p>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setEditingPrice(item.productId)
+                                    setTempPrice(String(item.unitPrice))
+                                  }}
+                                  className="h-5 w-5 p-0 hover:bg-green-50 dark:hover:bg-green-900/20"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                  </svg>
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => updateQuantity(item.productId, item.quantity - 1)} 
+                              className="h-7 w-7 p-0 rounded-lg"
+                            >
+                              <Minus className="h-3.5 w-3.5" />
+                            </Button>
+                            <span className="text-sm font-bold w-8 text-center">{item.quantity}</span>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => updateQuantity(item.productId, item.quantity + 1)} 
+                              className="h-7 w-7 p-0 rounded-lg"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Payment Method */}
+                {cart.length > 0 && (
+                  <div>
+                    <Label className="text-xs font-semibold mb-2 block">Payment Method</Label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: 'cash', icon: DollarSign, label: 'Cash' },
+                        { id: 'card', icon: CreditCard, label: 'Card' },
+                        { id: 'easypaisa', label: 'EasyPaisa' },
+                        { id: 'jazzcash', label: 'JazzCash' },
+                        { id: 'bank', label: 'Bank' },
+                        { id: 'installment', label: 'EMI' },
+                      ].map((method) => (
+                        <Button
+                          key={method.id}
+                          variant={paymentMethod === method.id ? 'default' : 'outline'}
+                          onClick={() => setPaymentMethod(method.id)}
+                          className={`h-10 text-[10px] font-semibold ${
+                            paymentMethod === method.id 
+                              ? 'bg-green-600 hover:bg-green-700 text-white' 
+                              : ''
+                          }`}
+                        >
+                          {method.icon && <method.icon className="h-3 w-3 mr-1" />}
+                          {method.label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom Summary - Sticky */}
+              {cart.length > 0 && (
+                <div className="sticky bottom-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 p-4 space-y-3">
+                  <div className="space-y-1.5 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
+                      <span className="font-semibold">PKR {calculateTotal().toLocaleString()}</span>
+                    </div>
+                    {calculateDiscount() > 0 && (
+                      <div className="flex justify-between text-orange-600">
+                        <span>Discount:</span>
+                        <span className="font-semibold">-PKR {calculateDiscount().toLocaleString()}</span>
+                      </div>
+                    )}
+                    {calculateTax() > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Tax ({taxPercentage}%):</span>
+                        <span className="font-semibold">PKR {calculateTax().toLocaleString()}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-between items-center text-lg font-bold border-t border-gray-300 dark:border-gray-600 pt-2">
+                    <span>Total:</span>
+                    <span className="text-green-600">PKR {calculateGrandTotal().toLocaleString()}</span>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      setShowMobileCart(false)
+                      handleCheckout()
+                    }}
+                    disabled={loading}
+                    className="w-full h-14 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold text-base shadow-lg rounded-xl"
+                  >
+                    {loading ? (
+                      <><Loader2 className="h-5 w-5 mr-2 animate-spin" /> Processing...</>
+                    ) : (
+                      <><Receipt className="h-5 w-5 mr-2" /> Complete Sale</>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

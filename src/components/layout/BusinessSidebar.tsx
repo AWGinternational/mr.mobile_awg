@@ -278,16 +278,6 @@ export function BusinessSidebar({ isOpen = false, onClose }: SidebarProps) {
       systemModule: 'MESSAGES' // Communication system, visible to all shop users
     },
     
-    // 13.5. Help Center - Tutorials and Support (All users)
-    { 
-      name: 'Help Center', 
-      icon: HelpCircle, 
-      path: '/help', 
-      color: 'text-blue-600', 
-      bgColor: 'bg-blue-50',
-      systemModule: 'HELP_CENTER' // Always visible, no permission needed
-    },
-    
     // 14. Team Management - Worker management (Owner only)
     { 
       name: 'Team', 
@@ -302,7 +292,17 @@ export function BusinessSidebar({ isOpen = false, onClose }: SidebarProps) {
       ]
     },
     
-    // 15. Shop Settings - Configuration
+    // 15. Help Center - Tutorials and Support (All users)
+    { 
+      name: 'Help Center', 
+      icon: HelpCircle, 
+      path: '/help', 
+      color: 'text-blue-600', 
+      bgColor: 'bg-blue-50',
+      systemModule: 'HELP_CENTER' // Always visible, no permission needed
+    },
+    
+    // 16. Shop Settings - Configuration
     { 
       name: 'Shop Settings', 
       icon: Settings, 

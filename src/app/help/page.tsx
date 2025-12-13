@@ -288,31 +288,31 @@ function HelpCenter() {
       <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
         <BusinessSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
           <TopNavigation onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
           
           <main className="flex-1 overflow-y-auto">
             <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
               {/* Header */}
-              <div className="mb-6">
+              <div className="mb-4 sm:mb-6">
                 <Button
                   variant="ghost"
                   onClick={() => router.back()}
-                  className="mb-4 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                  className="mb-3 sm:mb-4 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                 >
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back
                 </Button>
                 
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                    <HelpCircle className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                <div className="flex items-start gap-2 sm:gap-3 mb-2">
+                  <div className="p-2 sm:p-3 bg-blue-100 dark:bg-blue-900 rounded-lg flex-shrink-0">
+                    <HelpCircle className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 dark:text-blue-400" />
                   </div>
-                  <div>
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                  <div className="flex-1 min-w-0">
+                    <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white break-words">
                       Help Center - مدد سینٹر
                     </h1>
-                    <p className="text-gray-600 dark:text-gray-400">
+                    <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 break-words">
                       Learn how to use the software - سافٹ ویئر استعمال کرنا سیکھیں
                     </p>
                   </div>
@@ -320,16 +320,16 @@ function HelpCenter() {
               </div>
 
               {/* Search and Filter */}
-              <Card className="mb-6">
-                <CardContent className="p-4">
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="flex-1 relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <Card className="mb-4 sm:mb-6">
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex flex-col gap-3 sm:gap-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
                       <Input
                         placeholder="Search tutorials... تلاش کریں"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10"
+                        className="pl-9 sm:pl-10 text-sm sm:text-base h-9 sm:h-10"
                       />
                     </div>
                     <div className="flex gap-2 flex-wrap">
@@ -337,6 +337,7 @@ function HelpCenter() {
                         variant={categoryFilter === 'all' ? 'default' : 'outline'}
                         onClick={() => setCategoryFilter('all')}
                         size="sm"
+                        className="text-xs sm:text-sm h-8"
                       >
                         All
                       </Button>
@@ -344,6 +345,7 @@ function HelpCenter() {
                         variant={categoryFilter === 'basics' ? 'default' : 'outline'}
                         onClick={() => setCategoryFilter('basics')}
                         size="sm"
+                        className="text-xs sm:text-sm h-8"
                       >
                         Basics
                       </Button>
@@ -351,6 +353,7 @@ function HelpCenter() {
                         variant={categoryFilter === 'sales' ? 'default' : 'outline'}
                         onClick={() => setCategoryFilter('sales')}
                         size="sm"
+                        className="text-xs sm:text-sm h-8"
                       >
                         Sales
                       </Button>
@@ -358,6 +361,7 @@ function HelpCenter() {
                         variant={categoryFilter === 'inventory' ? 'default' : 'outline'}
                         onClick={() => setCategoryFilter('inventory')}
                         size="sm"
+                        className="text-xs sm:text-sm h-8"
                       >
                         Inventory
                       </Button>
@@ -365,6 +369,7 @@ function HelpCenter() {
                         variant={categoryFilter === 'reports' ? 'default' : 'outline'}
                         onClick={() => setCategoryFilter('reports')}
                         size="sm"
+                        className="text-xs sm:text-sm h-8"
                       >
                         Reports
                       </Button>
@@ -375,7 +380,7 @@ function HelpCenter() {
 
               {/* Tutorial Grid */}
               {!selectedTutorial ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
                   {filteredTutorials.map((tutorial) => {
                     const Icon = tutorial.icon
                     return (

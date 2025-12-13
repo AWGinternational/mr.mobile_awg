@@ -53,8 +53,10 @@ export async function GET(request: NextRequest) {
       productName: item.product.name,
       productSku: item.product.sku,
       quantity: item.quantity,
-      unitPrice: Number(item.product.sellingPrice),
-      totalPrice: Number(item.product.sellingPrice) * item.quantity,
+      unitPrice: item.customPrice ? Number(item.customPrice) : Number(item.product.sellingPrice),
+      originalPrice: Number(item.product.sellingPrice), // Keep track of original price
+      isCustomPrice: !!item.customPrice, // Flag if price is customized
+      totalPrice: (item.customPrice ? Number(item.customPrice) : Number(item.product.sellingPrice)) * item.quantity,
       product: item.product
     }))
 
@@ -125,13 +127,19 @@ export async function POST(request: NextRequest) {
     })
 
     if (existingItem) {
-      // Update quantity
+      // Update quantity (and customPrice if provided)
+      const updateData: any = {
+        quantity: existingItem.quantity + quantity,
+        updatedAt: new Date()
+      }
+      
+      if (unitPrice !== undefined) {
+        updateData.customPrice = unitPrice
+      }
+      
       const updatedItem = await prisma.cartItem.update({
         where: { id: existingItem.id },
-        data: { 
-          quantity: existingItem.quantity + quantity,
-          updatedAt: new Date()
-        },
+        data: updateData,
         include: {
           product: {
             include: {
@@ -141,6 +149,8 @@ export async function POST(request: NextRequest) {
           }
         }
       })
+
+      const finalUnitPrice = updatedItem.customPrice ? Number(updatedItem.customPrice) : Number(updatedItem.product.sellingPrice)
 
       return NextResponse.json({
         success: true,
@@ -150,20 +160,28 @@ export async function POST(request: NextRequest) {
           productName: updatedItem.product.name,
           productSku: updatedItem.product.sku,
           quantity: updatedItem.quantity,
-          unitPrice: Number(updatedItem.product.sellingPrice),
-          totalPrice: Number(updatedItem.product.sellingPrice) * updatedItem.quantity,
+          unitPrice: finalUnitPrice,
+          originalPrice: Number(updatedItem.product.sellingPrice),
+          isCustomPrice: !!updatedItem.customPrice,
+          totalPrice: finalUnitPrice * updatedItem.quantity,
           product: updatedItem.product
         }
       })
     } else {
       // Create new cart item
+      const createData: any = {
+        userId: session.user.id,
+        productId: productId,
+        shopId: shopId,
+        quantity: quantity
+      }
+      
+      if (unitPrice !== undefined) {
+        createData.customPrice = unitPrice
+      }
+      
       const newItem = await prisma.cartItem.create({
-        data: {
-          userId: session.user.id,
-          productId: productId,
-          shopId: shopId,
-          quantity: quantity
-        },
+        data: createData,
         include: {
           product: {
             include: {
@@ -174,6 +192,8 @@ export async function POST(request: NextRequest) {
         }
       })
 
+      const finalUnitPrice = newItem.customPrice ? Number(newItem.customPrice) : Number(newItem.product.sellingPrice)
+
       return NextResponse.json({
         success: true,
         item: {
@@ -182,8 +202,10 @@ export async function POST(request: NextRequest) {
           productName: newItem.product.name,
           productSku: newItem.product.sku,
           quantity: newItem.quantity,
-          unitPrice: Number(newItem.product.sellingPrice),
-          totalPrice: Number(newItem.product.sellingPrice) * newItem.quantity,
+          unitPrice: finalUnitPrice,
+          originalPrice: Number(newItem.product.sellingPrice),
+          isCustomPrice: !!newItem.customPrice,
+          totalPrice: finalUnitPrice * newItem.quantity,
           product: newItem.product
         }
       })
@@ -194,7 +216,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT - Update cart item quantity
+// PUT - Update cart item quantity or custom price
 export async function PUT(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -203,14 +225,25 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { productId, quantity } = body
+    const { productId, quantity, unitPrice } = body
 
-    if (!productId || quantity === undefined) {
-      return NextResponse.json({ error: 'Product ID and quantity are required' }, { status: 400 })
+    if (!productId) {
+      return NextResponse.json({ error: 'Product ID is required' }, { status: 400 })
     }
 
-    if (quantity <= 0) {
+    // Validate that at least one update field is provided
+    if (quantity === undefined && unitPrice === undefined) {
+      return NextResponse.json({ error: 'Either quantity or unitPrice is required' }, { status: 400 })
+    }
+
+    // Validate quantity if provided
+    if (quantity !== undefined && quantity <= 0) {
       return NextResponse.json({ error: 'Quantity must be greater than 0' }, { status: 400 })
+    }
+
+    // Validate unitPrice if provided
+    if (unitPrice !== undefined && unitPrice <= 0) {
+      return NextResponse.json({ error: 'Unit price must be greater than 0' }, { status: 400 })
     }
 
     // Get user's shop ID
@@ -230,6 +263,19 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'No shop assigned' }, { status: 400 })
     }
 
+    // Prepare update data
+    const updateData: any = {
+      updatedAt: new Date()
+    }
+    
+    if (quantity !== undefined) {
+      updateData.quantity = quantity
+    }
+    
+    if (unitPrice !== undefined) {
+      updateData.customPrice = unitPrice
+    }
+
     // Update cart item
     const updatedItem = await prisma.cartItem.update({
       where: {
@@ -239,10 +285,7 @@ export async function PUT(request: NextRequest) {
           shopId: shopId
         }
       },
-      data: { 
-        quantity: quantity,
-        updatedAt: new Date()
-      },
+      data: updateData,
       include: {
         product: {
           include: {
@@ -253,6 +296,8 @@ export async function PUT(request: NextRequest) {
       }
     })
 
+    const finalUnitPrice = updatedItem.customPrice ? Number(updatedItem.customPrice) : Number(updatedItem.product.sellingPrice)
+
     return NextResponse.json({
       success: true,
       item: {
@@ -261,8 +306,10 @@ export async function PUT(request: NextRequest) {
         productName: updatedItem.product.name,
         productSku: updatedItem.product.sku,
         quantity: updatedItem.quantity,
-        unitPrice: Number(updatedItem.product.sellingPrice),
-        totalPrice: Number(updatedItem.product.sellingPrice) * updatedItem.quantity,
+        unitPrice: finalUnitPrice,
+        originalPrice: Number(updatedItem.product.sellingPrice),
+        isCustomPrice: !!updatedItem.customPrice,
+        totalPrice: finalUnitPrice * updatedItem.quantity,
         product: updatedItem.product
       }
     })
