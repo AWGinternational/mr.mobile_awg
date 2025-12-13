@@ -148,6 +148,16 @@ export function BusinessSidebar({ isOpen = false, onClose }: SidebarProps) {
       systemModule: 'POS_SYSTEM'
     },
     
+    // 2.4 Sales Transactions - Sales history (moved below POS)
+    { 
+      name: 'Sales Transactions', 
+      icon: FileText, 
+      path: '/sales', 
+      color: 'text-green-600', 
+      bgColor: 'bg-green-50',
+      systemModule: 'SALES_REPORTS'
+    },
+    
     // 2.5 Online Banking - Mobile services and online banking fees
     { 
       name: 'Online Banking', 
@@ -202,16 +212,6 @@ export function BusinessSidebar({ isOpen = false, onClose }: SidebarProps) {
       color: 'text-pink-600', 
       bgColor: 'bg-pink-50',
       systemModule: 'CUSTOMER_MANAGEMENT'
-    },
-    
-    // 6. Sales Transactions - Sales history
-    { 
-      name: 'Sales Transactions', 
-      icon: FileText, 
-      path: '/sales', 
-      color: 'text-green-600', 
-      bgColor: 'bg-green-50',
-      systemModule: 'SALES_REPORTS'
     },
     
     // 6.5. Reports Dashboard - Comprehensive daily reports
