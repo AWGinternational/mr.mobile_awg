@@ -174,8 +174,6 @@ export async function POST(request: NextRequest) {
         }
       })
 
-      const finalUnitPrice = newItem.customPrice ? Number(newItem.customPrice) : Number(newItem.product.sellingPrice)
-
       return NextResponse.json({
         success: true,
         item: {
