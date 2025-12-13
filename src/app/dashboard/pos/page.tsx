@@ -709,7 +709,7 @@ function POSSystem() {
         // Reset discount and tax to defaults
         setDiscountAmount(0)
         setDiscountType('percentage')
-        setTaxPercentage(17)
+        setTaxPercentage(0)
         
         // Refresh products to update stock levels
         // Invalidate products query to refetch
@@ -1016,7 +1016,7 @@ function POSSystem() {
                                 ? 'border-green-400 bg-green-50 dark:bg-green-900/20 shadow-lg' 
                                 : 'border-gray-200 hover:border-orange-400 hover:shadow-xl'
                             }`}
-                            onClick={() => !isAdding && addToCart(product)}
+                            onClick={() => !isAdding && !loading && addToCart(product)}
                           >
                             <CardContent className="p-2.5 sm:p-3 md:p-4">
                               <div className="mb-2 sm:mb-3">
@@ -1288,6 +1288,7 @@ function POSSystem() {
                         placeholder="Customer name (optional)"
                         value={customerName}
                         onChange={(e) => setCustomerName(e.target.value)}
+                        disabled={loading}
                       />
                       <div className="relative">
                         <Input
@@ -1295,6 +1296,7 @@ function POSSystem() {
                           placeholder="Phone number (optional)"
                           value={customerPhone}
                           onChange={(e) => setCustomerPhone(e.target.value)}
+                          disabled={loading}
                         />
                         {customers.length > 0 && (
                           <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg max-h-40 overflow-y-auto">
@@ -1325,6 +1327,7 @@ function POSSystem() {
                               setCustomerName('')
                               setCustomerPhone('')
                             }}
+                            disabled={loading}
                           >
                             Clear
                           </Button>
@@ -1422,6 +1425,7 @@ function POSSystem() {
                               size="sm"
                               variant="outline"
                               onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                              disabled={loading}
                               className="h-6 w-6 p-0"
                             >
                               <Minus className="h-3 w-3" />
@@ -1431,6 +1435,7 @@ function POSSystem() {
                               size="sm"
                               variant="outline"
                               onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                              disabled={loading}
                               className="h-6 w-6 p-0"
                             >
                               <Plus className="h-3 w-3" />
@@ -1439,6 +1444,7 @@ function POSSystem() {
                               size="sm"
                               variant="outline"
                               onClick={() => removeFromCart(item.productId)}
+                              disabled={loading}
                               className="h-6 w-6 p-0 text-red-600 hover:text-red-700"
                             >
                               <Trash2 className="h-3 w-3" />
@@ -1467,6 +1473,7 @@ function POSSystem() {
                               min="0"
                               value={discountAmount === 0 ? '' : discountAmount}
                               onChange={(e) => setDiscountAmount(e.target.value === '' ? 0 : Number(e.target.value))}
+                              disabled={loading}
                               placeholder="0"
                               className="h-8 text-sm"
                             />
@@ -1476,6 +1483,7 @@ function POSSystem() {
                               variant={discountType === 'percentage' ? 'default' : 'outline'}
                               size="sm"
                               onClick={() => setDiscountType('percentage')}
+                              disabled={loading}
                               className="h-8 px-3 text-xs"
                             >
                               %
@@ -1484,6 +1492,7 @@ function POSSystem() {
                               variant={discountType === 'fixed' ? 'default' : 'outline'}
                               size="sm"
                               onClick={() => setDiscountType('fixed')}
+                              disabled={loading}
                               className="h-8 px-3 text-xs"
                             >
                               PKR
@@ -1516,6 +1525,7 @@ function POSSystem() {
                             step="0.5"
                             value={taxPercentage === 0 ? '' : taxPercentage}
                             onChange={(e) => setTaxPercentage(e.target.value === '' ? 0 : Number(e.target.value))}
+                            disabled={loading}
                             className="h-8 text-sm flex-1"
                             placeholder={`Default: ${shopSettings?.taxRate || 17}%`}
                           />
@@ -1524,6 +1534,7 @@ function POSSystem() {
                               variant="outline"
                               size="sm"
                               onClick={() => setTaxPercentage(0)}
+                              disabled={loading}
                               className="h-8 px-2 text-xs"
                             >
                               0%
@@ -1532,6 +1543,7 @@ function POSSystem() {
                               variant="outline"
                               size="sm"
                               onClick={() => setTaxPercentage(shopSettings?.taxRate || 17)}
+                              disabled={loading}
                               className="h-8 px-2 text-xs bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50"
                               title="Reset to shop default"
                             >
@@ -1559,6 +1571,7 @@ function POSSystem() {
                               variant={paymentMethod === 'cash' ? 'default' : 'outline'}
                               size="sm"
                               onClick={() => setPaymentMethod('cash')}
+                              disabled={loading}
                             >
                               <DollarSign className="h-4 w-4 mr-1" />
                               Cash
@@ -1569,6 +1582,7 @@ function POSSystem() {
                               variant={paymentMethod === 'card' ? 'default' : 'outline'}
                               size="sm"
                               onClick={() => setPaymentMethod('card')}
+                              disabled={loading}
                             >
                               <CreditCard className="h-4 w-4 mr-1" />
                               Card
@@ -1581,6 +1595,7 @@ function POSSystem() {
                               variant={paymentMethod === 'easypaisa' ? 'default' : 'outline'}
                               size="sm"
                               onClick={() => setPaymentMethod('easypaisa')}
+                              disabled={loading}
                               className="text-xs"
                             >
                               📱 EasyPaisa
@@ -1591,6 +1606,7 @@ function POSSystem() {
                               variant={paymentMethod === 'jazzcash' ? 'default' : 'outline'}
                               size="sm"
                               onClick={() => setPaymentMethod('jazzcash')}
+                              disabled={loading}
                               className="text-xs"
                             >
                               📱 JazzCash
@@ -1602,6 +1618,7 @@ function POSSystem() {
                             variant={paymentMethod === 'bank_transfer' ? 'default' : 'outline'}
                             size="sm"
                             onClick={() => setPaymentMethod('bank_transfer')}
+                            disabled={loading}
                             className="w-full text-xs"
                           >
                             🏦 Bank Transfer
@@ -1748,7 +1765,7 @@ function POSSystem() {
 
         {/* Mobile Cart Modal/Drawer */}
         {showMobileCart && (
-          <div className="lg:hidden fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm" onClick={() => setShowMobileCart(false)}>
+          <div className="lg:hidden fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm" onClick={() => !loading && setShowMobileCart(false)}>
             <div 
               className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-900 rounded-t-3xl max-h-[85vh] overflow-hidden shadow-2xl animate-slide-up"
               onClick={(e) => e.stopPropagation()}
@@ -1766,6 +1783,7 @@ function POSSystem() {
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowMobileCart(false)}
+                  disabled={loading}
                   className="h-10 w-10 p-0 rounded-full bg-white/10 hover:bg-white/20 text-white"
                 >
                   <X className="h-5 w-5" />
@@ -1785,12 +1803,14 @@ function POSSystem() {
                       placeholder="Name"
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
+                      disabled={loading}
                       className="h-10 text-sm"
                     />
                     <Input
                       placeholder="Phone"
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value)}
+                      disabled={loading}
                       className="h-10 text-sm"
                     />
                   </div>
@@ -1815,6 +1835,7 @@ function POSSystem() {
                             size="sm"
                             variant="ghost"
                             onClick={() => removeFromCart(item.productId)}
+                            disabled={loading}
                             className="h-7 w-7 p-0 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -1891,6 +1912,7 @@ function POSSystem() {
                               size="sm" 
                               variant="outline" 
                               onClick={() => updateQuantity(item.productId, item.quantity - 1)} 
+                              disabled={loading}
                               className="h-7 w-7 p-0 rounded-lg"
                             >
                               <Minus className="h-3.5 w-3.5" />
@@ -1900,6 +1922,7 @@ function POSSystem() {
                               size="sm" 
                               variant="outline" 
                               onClick={() => updateQuantity(item.productId, item.quantity + 1)} 
+                              disabled={loading}
                               className="h-7 w-7 p-0 rounded-lg"
                             >
                               <Plus className="h-3.5 w-3.5" />
@@ -1928,6 +1951,7 @@ function POSSystem() {
                           key={method.id}
                           variant={paymentMethod === method.id ? 'default' : 'outline'}
                           onClick={() => setPaymentMethod(method.id)}
+                          disabled={loading}
                           className={`h-10 text-[10px] font-semibold ${
                             paymentMethod === method.id 
                               ? 'bg-green-600 hover:bg-green-700 text-white' 
