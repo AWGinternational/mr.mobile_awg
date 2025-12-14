@@ -220,6 +220,15 @@ function ProductManagementPage() {
   const brands = brandsData || []
   const loading = productsLoading
   const pagination = productsData?.pagination
+  
+  // Use stats from API (for ALL filtered products, not just current page)
+  const stats = productsData?.stats || {
+    total: 0,
+    active: 0,
+    inStock: 0,
+    lowStock: 0,
+    outOfStock: 0
+  }
 
   // Handle errors
   useEffect(() => {
@@ -831,13 +840,8 @@ function ProductManagementPage() {
     }
   }
 
-  const stats = {
-    total: products.length,
-    active: products.filter((p: { status: string }) => p.status === 'ACTIVE').length,
-    inStock: products.filter((p: { stock: number; lowStockThreshold: number }) => p.stock > p.lowStockThreshold).length,
-    lowStock: products.filter((p: { stock: number; lowStockThreshold: number }) => p.stock > 0 && p.stock <= p.lowStockThreshold).length,
-    outOfStock: products.filter((p: { stock: number }) => p.stock === 0).length
-  }
+  // Stats are now provided by the API for ALL filtered products (not just current page)
+  // No need to calculate here - use the stats from productsData
 
   return (
     <ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.SHOP_OWNER, UserRole.SHOP_WORKER]}>

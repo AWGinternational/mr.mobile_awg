@@ -71,6 +71,14 @@ export default function TransactionHistoryPage() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
+  
+  // Store aggregate totals from API (for ALL filtered records)
+  const [totals, setTotals] = useState({
+    amount: 0,
+    commission: 0,
+    discount: 0,
+    netCommission: 0,
+  });
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -104,6 +112,16 @@ export default function TransactionHistoryPage() {
       if (response.ok) {
         setTransactions(data.transactions);
         setPagination(data.pagination);
+        
+        // Set aggregate totals from API (for ALL filtered records)
+        if (data.totals) {
+          setTotals({
+            amount: Number(data.totals.totalAmount) || 0,
+            commission: Number(data.totals.totalCommission) || 0,
+            discount: Number(data.totals.totalDiscount) || 0,
+            netCommission: Number(data.totals.totalNetCommission) || 0,
+          });
+        }
       }
     } catch (error) {
       console.error('Error fetching transactions:', error);
@@ -209,16 +227,8 @@ export default function TransactionHistoryPage() {
     }
   };
 
-  // Calculate totals
-  const totals = transactions.reduce(
-    (acc, t) => ({
-      amount: acc.amount + parseFloat(t.amount.toString()),
-      commission: acc.commission + parseFloat(t.commission.toString()),
-      discount: acc.discount + parseFloat(t.discount.toString()),
-      netCommission: acc.netCommission + parseFloat(t.netCommission.toString()),
-    }),
-    { amount: 0, commission: 0, discount: 0, netCommission: 0 }
-  );
+  // Totals are now provided by the API for ALL filtered records (not just current page)
+  // No need to calculate here - use the totals from state
 
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">

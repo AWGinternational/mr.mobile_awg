@@ -116,8 +116,29 @@ export async function GET(request: NextRequest) {
       take: limit,
     });
 
+    // Calculate aggregate totals for ALL filtered records (not just current page)
+    const aggregates = await prisma.mobileService.aggregate({
+      where,
+      _sum: {
+        amount: true,
+        commission: true,
+        discount: true,
+        netCommission: true,
+      },
+    });
+
+    // Prepare aggregate totals
+    const totals = {
+      totalAmount: aggregates._sum.amount || 0,
+      totalCommission: aggregates._sum.commission || 0,
+      totalDiscount: aggregates._sum.discount || 0,
+      totalNetCommission: aggregates._sum.netCommission || 0,
+      transactionCount: total,
+    };
+
     return NextResponse.json({
       transactions,
+      totals,
       pagination: {
         page,
         limit,

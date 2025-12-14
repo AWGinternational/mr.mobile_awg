@@ -145,6 +145,29 @@ export async function GET(request: NextRequest) {
       markupPercentage: product.markupPercentage ? Number(product.markupPercentage) : null
     }))
 
+    // Calculate aggregate statistics for ALL filtered products (not just current page)
+    const allFilteredProducts = await prisma.product.findMany({
+      where,
+      include: {
+        _count: {
+          select: { 
+            inventoryItems: {
+              where: { status: 'IN_STOCK' }
+            }
+          }
+        }
+      }
+    })
+
+    // Calculate stats
+    const stats = {
+      total: totalCount,
+      active: allFilteredProducts.filter(p => p.status === 'ACTIVE').length,
+      inStock: allFilteredProducts.filter(p => p._count.inventoryItems > p.lowStockThreshold).length,
+      lowStock: allFilteredProducts.filter(p => p._count.inventoryItems > 0 && p._count.inventoryItems <= p.lowStockThreshold).length,
+      outOfStock: allFilteredProducts.filter(p => p._count.inventoryItems === 0).length
+    }
+
     const totalPages = Math.ceil(totalCount / limit)
     const hasNextPage = page < totalPages
     const hasPreviousPage = page > 1
@@ -152,6 +175,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       products: productsWithStock,
+      stats,
       pagination: {
         page,
         limit,
